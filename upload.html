@@ -43,6 +43,20 @@
             min-height: 20px;
         }
 
+        /* 查無名單時彈出的手動輸入框樣式 */
+        .extra-fields {
+            display: none;
+            background: #fff8e1;
+            border: 1px dashed #ffa000;
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 16px;
+        }
+
+        .extra-fields .form-group:last-child {
+            margin-bottom: 0;
+        }
+
         #previewBox {
             display: none;
             margin-top: 10px;
@@ -51,6 +65,7 @@
 
         #previewBox img {
             max-width: 100%;
+            max-height: 220px;
             border-radius: 6px;
             border: 1px solid #ddd;
         }
@@ -87,20 +102,37 @@
         <div id="studentTip"></div>
     </div>
 
+    <!-- 未在名冊中的同學，動態展開此區塊 -->
+    <div id="extraFields" class="extra-fields">
+        <p style="margin: 0 0 10px; color: #e65100; font-size: 13px; font-weight: bold;">
+            ⚠️ 名冊中查無此學號（選修/外系生），請手動補填基本資料：
+        </p>
+        <div class="form-group">
+            <label for="customName">學生姓名：</label>
+            <input type="text" id="customName" placeholder="請輸入您的真實姓名">
+        </div>
+        <div class="form-group">
+            <label for="customClass">所屬班級：</label>
+            <input type="text" id="customClass" placeholder="例如：資管二A、企管三B">
+        </div>
+    </div>
+
     <div class="form-group">
         <label for="imageFile">選擇作業截圖：</label>
         <input type="file" id="imageFile" accept="image/*">
-
+        <div id="previewBox">
+            <img id="imagePreview" alt="作業截圖預覽">
+        </div>
     </div>
 
     <button id="submitBtn" onclick="submitHomework()">確認並送出繳交</button>
-    <div id="previewBox">
-        <img id="imagePreview" alt="作業截圖預覽">
-    </div>
+
     <script src="config.js"></script>
     <script>
         let userIP = "未知";
-        let verifiedName = "";
+        let isManualInput = false; // 是否為自訂輸入模式
+        let currentStudentName = "";
+        let currentClassName = "";
 
         // 取得 IP
         fetch("https://api.ipify.org?format=json")
@@ -108,28 +140,41 @@
             .then(data => { userIP = data.ip; })
             .catch(() => { userIP = "獲取失敗"; });
 
-        // 初始化日期
         document.addEventListener("DOMContentLoaded", () => {
             initCourseDateSelect("courseDate");
         });
 
-        // 驗證學號
         const studentInput = document.getElementById("studentId");
         const tip = document.getElementById("studentTip");
+        const extraFields = document.getElementById("extraFields");
+
+        // 監聽學號輸入：動態判斷名單或切換手動模式
         studentInput.addEventListener("input", (e) => {
             const val = e.target.value.trim();
+
             if (val.length === 10) {
                 if (STUDENTS[val]) {
-                    verifiedName = STUDENTS[val];
+                    // 1. 名冊內同學
+                    isManualInput = false;
+                    currentStudentName = STUDENTS[val].name;
+                    currentClassName = STUDENTS[val].className;
+                    extraFields.style.display = "none";
                     tip.style.color = "#2e7d32";
-                    tip.innerText = `✓ 確認身分：${verifiedName} 同學`;
+                    tip.innerText = `✓ 確認身分：${currentStudentName} 同學（${currentClassName}）`;
                 } else {
-                    verifiedName = "";
-                    tip.style.color = "#d32f2f";
-                    tip.innerText = "✕ 查無此學號，請重新確認！";
+                    // 2. 名冊外的同學 -> 展開自訂輸入框
+                    isManualInput = true;
+                    currentStudentName = "";
+                    currentClassName = "";
+                    extraFields.style.display = "block";
+                    tip.style.color = "#e65100";
+                    tip.innerText = "ℹ️ 非本班名冊名單，請於下方手動填寫「姓名」與「班級」";
                 }
             } else {
-                verifiedName = "";
+                isManualInput = false;
+                extraFields.style.display = "none";
+                currentStudentName = "";
+                currentClassName = "";
                 tip.innerText = val.length > 0 ? `已輸入 ${val.length}/10 碼...` : "";
             }
         });
@@ -154,16 +199,27 @@
             const date = document.getElementById("courseDate").value;
             const btn = document.getElementById("submitBtn");
 
-            if (!STUDENTS[id] || !verifiedName) {
-                alert("請確認 10 碼學號是否正確無誤！");
+            if (id.length !== 10) {
+                alert("請填寫正確的 10 碼學號！");
                 return;
             }
+
+            // 如果是自訂輸入，檢查欄位是否填寫
+            if (isManualInput) {
+                currentStudentName = document.getElementById("customName").value.trim();
+                currentClassName = document.getElementById("customClass").value.trim();
+                if (!currentStudentName || !currentClassName) {
+                    alert("請完整填寫手動補填的「姓名」與「班級」！");
+                    return;
+                }
+            }
+
             if (!fileInput.files.length) {
                 alert("請先選擇作業截圖！");
                 return;
             }
 
-            const confirmMsg = `請確認作業資料：\n日期：${date}\n學號：${id}\n姓名：${verifiedName}\n\n確定送出嗎？`;
+            const confirmMsg = `請確認作業資料：\n日期：${date}\n學號：${id}\n姓名：${currentStudentName}\n班級：${currentClassName}\n\n確定送出嗎？`;
             if (!confirm(confirmMsg)) return;
 
             btn.disabled = true;
@@ -174,7 +230,8 @@
                 const payload = {
                     courseDate: date,
                     studentId: id,
-                    studentName: verifiedName,
+                    studentName: currentStudentName,
+                    className: currentClassName,
                     clientIP: userIP,
                     image: reader.result
                 };

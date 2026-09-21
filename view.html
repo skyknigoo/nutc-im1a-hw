@@ -1,103 +1,189 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
+
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>作業清單查閱</title>
-  <style>
-    body { font-family: sans-serif; padding: 20px; margin: 0; background: #fff; }
-    .toolbar { display: flex; gap: 10px; align-items: center; margin-bottom: 12px; }
-    select, button { padding: 8px 12px; font-size: 15px; border-radius: 4px; border: 1px solid #ccc; }
-    button { background: #1976d2; color: #fff; border: none; cursor: pointer; }
-    .stats { font-weight: bold; margin-bottom: 12px; font-size: 15px; }
-    table { width: 100%; border-collapse: collapse; }
-    th, td { border: 1px solid #ddd; padding: 8px 10px; text-align: left; font-size: 14px; }
-    th { background: #f5f5f5; }
-    .tag-ok { color: #2e7d32; font-weight: bold; }
-    .tag-no { color: #d32f2f; font-weight: bold; }
-    .thumb { max-width: 80px; max-height: 48px; border-radius: 4px; border: 1px solid #ccc; vertical-align: middle; cursor: pointer; }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>作業清單查閱</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            padding: 20px;
+            margin: 0;
+            background: #fff;
+        }
+
+        .toolbar {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        select,
+        button {
+            padding: 8px 12px;
+            font-size: 15px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+        }
+
+        button {
+            background: #1976d2;
+            color: #fff;
+            border: none;
+            cursor: pointer;
+        }
+
+        .stats {
+            font-weight: bold;
+            margin-bottom: 12px;
+            font-size: 15px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th,
+        td {
+            border: 1px solid #ddd;
+            padding: 8px 10px;
+            text-align: left;
+            font-size: 14px;
+        }
+
+        th {
+            background: #f5f5f5;
+        }
+
+        .tag-ok {
+            color: #2e7d32;
+            font-weight: bold;
+        }
+
+        .tag-no {
+            color: #d32f2f;
+            font-weight: bold;
+        }
+
+        .thumb {
+            max-width: 80px;
+            max-height: 48px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+            vertical-align: middle;
+            cursor: pointer;
+        }
+    </style>
 </head>
+
 <body>
 
-  <div class="toolbar">
-    <label for="queryDate"><strong>日期：</strong></label>
-    <select id="queryDate"></select>
-    <button onclick="fetchRecords()">查詢 / 重新整理</button>
-  </div>
+    <div class="toolbar">
+        <label for="queryDate"><strong>日期：</strong></label>
+        <select id="queryDate"></select>
+        <button onclick="fetchRecords()">查詢 / 重新整理</button>
+    </div>
 
-  <div class="stats" id="statsBar">請點擊查詢以載入資料</div>
+    <div class="stats" id="statsBar">請點擊查詢以載入資料</div>
 
-  <table>
-    <thead>
-      <tr>
-        <th>學號</th>
-        <th>姓名</th>
-        <th>狀態</th>
-        <th>繳交時間</th>
-        <th>截圖預覽</th>
-      </tr>
-    </thead>
-    <tbody id="recordTable">
-      <tr><td colspan="5" style="text-align:center; color:#888;">尚未載入資料</td></tr>
-    </tbody>
-  </table>
+    <table>
+        <thead>
+            <tr>
+                <th>學號</th>
+                <th>班級</th>
+                <th>姓名</th>
+                <th>狀態</th>
+                <th>繳交時間</th>
+                <th>截圖預覽</th>
+            </tr>
+        </thead>
+        <tbody id="recordTable">
+            <tr>
+                <td colspan="6" style="text-align:center; color:#888;">尚未載入資料</td>
+            </tr>
+        </tbody>
+    </table>
 
-  <script src="config.js"></script>
-  <script>
-    document.addEventListener("DOMContentLoaded", () => {
-      initCourseDateSelect("queryDate");
-      fetchRecords(); // 頁面載入時自動查一次最近日期
-    });
+    <script src="config.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            initCourseDateSelect("queryDate");
+            fetchRecords();
+        });
 
-    async function fetchRecords() {
-      const date = document.getElementById("queryDate").value;
-      const tbody = document.getElementById("recordTable");
-      const stats = document.getElementById("statsBar");
+        async function fetchRecords() {
+            const date = document.getElementById("queryDate").value;
+            const tbody = document.getElementById("recordTable");
+            const stats = document.getElementById("statsBar");
 
-      if (!date) return;
-      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">資料載入中...</td></tr>';
+            if (!date) return;
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">資料載入中...</td></tr>';
 
-      try {
-        const res = await fetch(`${GAS_URL}?date=${date}`);
-        const data = await res.json();
+            try {
+                const res = await fetch(`${GAS_URL}?date=${date}`);
+                const data = await res.json();
 
-        tbody.innerHTML = "";
-        let count = 0;
-        const total = Object.keys(STUDENTS).length;
+                tbody.innerHTML = "";
+                let count = 0;
 
-        // 依學號順序依序渲染
-        Object.keys(STUDENTS).forEach(id => {
-          const name = STUDENTS[id];
-          const record = data.find(r => String(r.studentId) === String(id));
+                // 1. 先列出已存在靜態名單中的同學
+                const renderedIds = new Set();
+                Object.keys(STUDENTS).forEach(id => {
+                    renderedIds.add(id);
+                    const student = STUDENTS[id];
+                    const record = data.find(r => String(r.studentId) === String(id));
 
-          const tr = document.createElement("tr");
-          if (record) {
-            count++;
-            tr.innerHTML = `
+                    const tr = document.createElement("tr");
+                    if (record) {
+                        count++;
+                        tr.innerHTML = `
               <td>${id}</td>
-              <td>${name}</td>
+              <td>${record.className || student.className}</td>
+              <td>${student.name}</td>
               <td class="tag-ok">✓ 已繳交</td>
               <td>${record.time}</td>
               <td><a href="${record.url}" target="_blank"><img src="${record.url}" class="thumb" title="點擊檢視原圖"></a></td>
             `;
-          } else {
-            tr.innerHTML = `
+                    } else {
+                        tr.innerHTML = `
               <td>${id}</td>
-              <td>${name}</td>
+              <td>${student.className}</td>
+              <td>${student.name}</td>
               <td class="tag-no">✕ 未繳交</td>
               <td>-</td>
               <td>-</td>
             `;
-          }
-          tbody.appendChild(tr);
-        });
+                    }
+                    tbody.appendChild(tr);
+                });
 
-        stats.innerText = `【${date}】 繳交人數：${count} / ${total} 人（缺交 ${total - count} 人）`;
-      } catch (e) {
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:red;">讀取失敗，請確認網路連線或 GAS 權限！</td></tr>';
-      }
-    }
-  </script>
+                // 2. 額外追加「非靜態名單的手動上傳選修同學」
+                data.forEach(r => {
+                    if (!renderedIds.has(String(r.studentId))) {
+                        count++;
+                        const tr = document.createElement("tr");
+                        tr.innerHTML = `
+              <td>${r.studentId}</td>
+              <td>${r.className} (外系/選修)</td>
+              <td>${r.studentName}</td>
+              <td class="tag-ok">✓ 已繳交</td>
+              <td>${r.time}</td>
+              <td><a href="${r.url}" target="_blank"><img src="${r.url}" class="thumb" title="點擊檢視原圖"></a></td>
+            `;
+                        tbody.appendChild(tr);
+                    }
+                });
+
+                const totalExpected = Object.keys(STUDENTS).length;
+                stats.innerText = `【${date}】 實收作業：${count} 份（本班預期應收 ${totalExpected} 人）`;
+            } catch (e) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:red;">讀取失敗，請確認網路或 GAS 狀態！</td></tr>';
+            }
+        }
+    </script>
 </body>
+
 </html>
