@@ -5,6 +5,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>作業上傳</title>
+    <!-- 引入 SweetAlert2 -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
         body {
             font-family: sans-serif;
@@ -43,7 +45,6 @@
             min-height: 20px;
         }
 
-        /* 查無名單時彈出的手動輸入框樣式 */
         .extra-fields {
             display: none;
             background: #fff8e1;
@@ -64,13 +65,12 @@
         }
 
         #previewBox img {
-            max-width: 100%;
-            max-height: 220px;
+            max-width: 960px;
             border-radius: 6px;
             border: 1px solid #ddd;
         }
 
-        button {
+        button.submit-btn {
             width: 100%;
             padding: 12px;
             font-size: 16px;
@@ -80,11 +80,23 @@
             border: none;
             border-radius: 5px;
             cursor: pointer;
+            transition: background 0.2s;
         }
 
-        button:disabled {
+        button.submit-btn:hover {
+            background: #1565c0;
+        }
+
+        button.submit-btn:disabled {
             background: #aaa;
             cursor: not-allowed;
+        }
+
+        /* 控制 SweetAlert 頂部距離 */
+        .custom-top-swal {
+            margin-top: 45px !important;
+            border-radius: 12px !important;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25) !important;
         }
     </style>
 </head>
@@ -92,7 +104,7 @@
 <body>
 
     <div class="form-group">
-        <label for="courseDate">上課日期：</label>
+        <label for="courseDate">上課日期（僅顯示已開放日期）：</label>
         <select id="courseDate"></select>
     </div>
 
@@ -102,14 +114,14 @@
         <div id="studentTip"></div>
     </div>
 
-    <!-- 未在名冊中的同學，動態展開此區塊 -->
+    <!-- 未在名冊中的同學手動補填框 -->
     <div id="extraFields" class="extra-fields">
         <p style="margin: 0 0 10px; color: #e65100; font-size: 13px; font-weight: bold;">
             ⚠️ 名冊中查無此學號（選修/外系生），請手動補填基本資料：
         </p>
         <div class="form-group">
             <label for="customName">學生姓名：</label>
-            <input type="text" id="customName" placeholder="請輸入您的真實姓名">
+            <input type="text" id="customName" placeholder="請輸入真實姓名">
         </div>
         <div class="form-group">
             <label for="customClass">所屬班級：</label>
@@ -118,23 +130,30 @@
     </div>
 
     <div class="form-group">
-        <label for="imageFile">選擇作業截圖：</label>
+        <label for="imageFile">選擇作業截圖（自動轉檔為 JPG）：</label>
         <input type="file" id="imageFile" accept="image/*">
-        <div id="previewBox">
-            <img id="imagePreview" alt="作業截圖預覽">
-        </div>
+
     </div>
 
-    <button id="submitBtn" onclick="submitHomework()">確認並送出繳交</button>
-
+    <button id="submitBtn" class="submit-btn" onclick="submitHomework()">確認並送出繳交</button>
+    <div id="previewBox">
+        <img id="imagePreview" alt="作業截圖預覽">
+    </div>
     <script src="config.js"></script>
     <script>
+        // 建立全域統一的靠頂彈窗
+        const MySwal = Swal.mixin({
+            position: "top",
+            customClass: {
+                popup: "custom-top-swal"
+            }
+        });
+
         let userIP = "未知";
-        let isManualInput = false; // 是否為自訂輸入模式
+        let isManualInput = false;
         let currentStudentName = "";
         let currentClassName = "";
 
-        // 取得 IP
         fetch("https://api.ipify.org?format=json")
             .then(res => res.json())
             .then(data => { userIP = data.ip; })
@@ -147,14 +166,15 @@
         const studentInput = document.getElementById("studentId");
         const tip = document.getElementById("studentTip");
         const extraFields = document.getElementById("extraFields");
+        const fileInput = document.getElementById("imageFile");
+        const previewBox = document.getElementById("previewBox");
+        const previewImg = document.getElementById("imagePreview");
 
-        // 監聽學號輸入：動態判斷名單或切換手動模式
         studentInput.addEventListener("input", (e) => {
             const val = e.target.value.trim();
 
             if (val.length === 10) {
                 if (STUDENTS[val]) {
-                    // 1. 名冊內同學
                     isManualInput = false;
                     currentStudentName = STUDENTS[val].name;
                     currentClassName = STUDENTS[val].className;
@@ -162,7 +182,6 @@
                     tip.style.color = "#2e7d32";
                     tip.innerText = `✓ 確認身分：${currentStudentName} 同學（${currentClassName}）`;
                 } else {
-                    // 2. 名冊外的同學 -> 展開自訂輸入框
                     isManualInput = true;
                     currentStudentName = "";
                     currentClassName = "";
@@ -179,10 +198,6 @@
             }
         });
 
-        // 圖片預覽
-        const fileInput = document.getElementById("imageFile");
-        const previewBox = document.getElementById("previewBox");
-        const previewImg = document.getElementById("imagePreview");
         fileInput.addEventListener("change", function () {
             const file = this.files[0];
             if (file) {
@@ -193,70 +208,159 @@
             }
         });
 
-        // 送出繳交
         async function submitHomework() {
             const id = studentInput.value.trim();
             const date = document.getElementById("courseDate").value;
             const btn = document.getElementById("submitBtn");
 
-            if (id.length !== 10) {
-                alert("請填寫正確的 10 碼學號！");
+            if (!date) {
+                MySwal.fire({
+                    icon: "warning",
+                    title: "提示",
+                    text: "目前尚無可選的上課日期或未開放！",
+                    confirmButtonColor: "#1976d2"
+                });
                 return;
             }
 
-            // 如果是自訂輸入，檢查欄位是否填寫
+            if (id.length !== 10) {
+                MySwal.fire({
+                    icon: "warning",
+                    title: "學號不完整",
+                    text: "請填寫正確且完整的 10 碼學號！",
+                    confirmButtonColor: "#1976d2"
+                });
+                return;
+            }
+
             if (isManualInput) {
                 currentStudentName = document.getElementById("customName").value.trim();
                 currentClassName = document.getElementById("customClass").value.trim();
                 if (!currentStudentName || !currentClassName) {
-                    alert("請完整填寫手動補填的「姓名」與「班級」！");
+                    MySwal.fire({
+                        icon: "warning",
+                        title: "資料未完整",
+                        text: "請完整填寫手動補填的「姓名」與「班級」！",
+                        confirmButtonColor: "#1976d2"
+                    });
                     return;
                 }
             }
 
             if (!fileInput.files.length) {
-                alert("請先選擇作業截圖！");
+                MySwal.fire({
+                    icon: "warning",
+                    title: "請選擇截圖",
+                    text: "請先選擇欲繳交的作業截圖檔案！",
+                    confirmButtonColor: "#1976d2"
+                });
                 return;
             }
 
-            const confirmMsg = `請確認作業資料：\n日期：${date}\n學號：${id}\n姓名：${currentStudentName}\n班級：${currentClassName}\n\n確定送出嗎？`;
-            if (!confirm(confirmMsg)) return;
+            // 確認視窗
+            const confirmResult = await MySwal.fire({
+                title: "確認繳交作業？",
+                html: `
+                    <div style="text-align: left; font-size: 14px; background: #f8f9fa; padding: 12px; border-radius: 6px; line-height: 1.8;">
+                        <b>📅 上課日期：</b> ${date}<br>
+                        <b>🆔 學生學號：</b> ${id}<br>
+                        <b>👤 學生姓名：</b> ${currentStudentName}<br>
+                        <b>🏫 所屬班級：</b> ${currentClassName}<br>
+                        <hr style="border: none; border-top: 1px dashed #ccc; margin: 8px 0;">
+                        <span style="color: #e65100;">⚠️ 若當日已有繳交紀錄，新檔案將自動覆蓋舊作業。</span>
+                    </div>
+                `,
+                icon: "question",
+                showCancelButton: true,
+                confirmButtonText: "確定送出",
+                cancelButtonText: "取消",
+                confirmButtonColor: "#1976d2",
+                cancelButtonColor: "#757575"
+            });
+
+            if (!confirmResult.isConfirmed) return;
+
+            // Loading 視窗
+            MySwal.fire({
+                title: "上傳中...",
+                text: "正在上傳資料，請稍候",
+                allowOutsideClick: false,
+                allowEscapeKey: false,
+                didOpen: () => {
+                    Swal.showLoading();
+                }
+            });
 
             btn.disabled = true;
-            btn.innerText = "圖片轉檔與上傳中，請稍候...";
 
+            const file = fileInput.files[0];
+            const img = new Image();
             const reader = new FileReader();
-            reader.onload = async function () {
-                const payload = {
-                    courseDate: date,
-                    studentId: id,
-                    studentName: currentStudentName,
-                    className: currentClassName,
-                    clientIP: userIP,
-                    image: reader.result
-                };
 
-                try {
-                    const res = await fetch(GAS_URL, {
-                        method: "POST",
-                        body: JSON.stringify(payload)
-                    });
-                    const result = await res.json();
-                    if (result.status === "success") {
-                        alert(`繳交成功！\n檔名：${result.fileName}`);
+            reader.onload = function (e) {
+                img.src = e.target.result;
+                img.onload = async function () {
+                    const canvas = document.createElement("canvas");
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    const ctx = canvas.getContext("2d");
+
+                    ctx.fillStyle = "#FFFFFF";
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    ctx.drawImage(img, 0, 0);
+
+                    const jpegBase64 = canvas.toDataURL("image/jpeg", 0.92);
+
+                    const payload = {
+                        courseDate: date,
+                        studentId: id,
+                        studentName: currentStudentName,
+                        className: currentClassName,
+                        clientIP: userIP,
+                        image: jpegBase64
+                    };
+
+                    try {
+                        const res = await fetch(GAS_URL, {
+                            method: "POST",
+                            body: JSON.stringify(payload)
+                        });
+                        const result = await res.json();
+
+                        if (result.status === "success") {
+                            await MySwal.fire({
+                                icon: "success",
+                                title: "繳交成功！",
+                                html: `
+                                    <b>檔名：</b>${result.fileName}<br>
+                                    <b>狀態：</b>${result.overwritten ? "<span style='color:#e65100;'>已成功覆蓋舊作業</span>" : "<span style='color:#2e7d32;'>新作業已建立</span>"}<br>
+                                    <b>更新時間：</b>${result.updatedTime}
+                                `,
+                                confirmButtonColor: "#1976d2"
+                            });
+                            location.reload();
+                        } else {
+                            MySwal.fire({
+                                icon: "error",
+                                title: "上傳失敗",
+                                text: result.message || "系統回傳錯誤，請聯絡管理員！",
+                                confirmButtonColor: "#1976d2"
+                            });
+                        }
+                    } catch (err) {
+                        await MySwal.fire({
+                            icon: "info",
+                            title: "資料已送出",
+                            text: "連線狀態已確認，請至清單預覽確認作業是否呈現！",
+                            confirmButtonColor: "#1976d2"
+                        });
                         location.reload();
-                    } else {
-                        alert("上傳失敗：" + result.message);
+                    } finally {
+                        btn.disabled = false;
                     }
-                } catch (err) {
-                    alert("資料已送出！請至小老師列表確認。");
-                    location.reload();
-                } finally {
-                    btn.disabled = false;
-                    btn.innerText = "確認並送出繳交";
-                }
+                };
             };
-            reader.readAsDataURL(fileInput.files[0]);
+            reader.readAsDataURL(file);
         }
     </script>
 </body>

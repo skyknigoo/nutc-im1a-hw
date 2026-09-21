@@ -77,33 +77,40 @@ Object.keys(STUDENTS).forEach(id => {
   }
 });
 
-// 4. 動態填充下拉選單（過濾未來日期）
+// 4. 動態填充下拉選單（過濾未來時間，只顯示今天與過去的日期）
 function initCourseDateSelect(selectElementId) {
   const select = document.getElementById(selectElementId);
+  if (!select) return;
   select.innerHTML = "";
 
+  // 取得今天日期字串 (格式: YYYYMMDD)
   const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-  const todayStr = `${year}${month}${day}`;
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, "0");
+  const d = String(now.getDate()).padStart(2, "0");
+  const todayStr = `${y}${m}${d}`;
 
-  const availableDates = COURSE_DATES.filter(d => d <= todayStr);
+  // 【核心過濾】：只保留小於或等於今天的上課日期
+  const pastOrTodayDates = COURSE_DATES.filter(dateStr => dateStr <= todayStr);
 
-  if (availableDates.length === 0) {
+  if (pastOrTodayDates.length === 0) {
     const opt = document.createElement("option");
     opt.value = "";
-    opt.innerText = "尚未有可繳交之上課日期";
+    opt.innerText = "尚無已開放的上課日期";
     select.appendChild(opt);
     return;
   }
 
-  const sortedDates = [...availableDates].reverse();
-  sortedDates.forEach((dateStr, idx) => {
+  // 倒序排列（讓最近一次/最新的一堂課排在最上方供同學預設選取）
+  pastOrTodayDates.sort().reverse();
+
+  pastOrTodayDates.forEach((dateStr, idx) => {
     const opt = document.createElement("option");
     opt.value = dateStr;
     const formatted = `${dateStr.substring(0, 4)}-${dateStr.substring(4, 6)}-${dateStr.substring(6, 8)}`;
     opt.innerText = `${formatted} (週六)`;
+
+    // 預設選取最近一次的上課日期
     if (idx === 0) opt.selected = true;
     select.appendChild(opt);
   });

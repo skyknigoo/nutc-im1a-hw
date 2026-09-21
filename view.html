@@ -68,13 +68,85 @@
             font-weight: bold;
         }
 
+        /* 縮圖樣式與懸停微動效 */
         .thumb {
             max-width: 80px;
             max-height: 48px;
             border-radius: 4px;
             border: 1px solid #ccc;
             vertical-align: middle;
+            cursor: zoom-in;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .thumb:hover {
+            transform: scale(1.08);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+        }
+
+        /* 燈箱背景遮罩 */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0, 0, 0, 0.82);
+            backdrop-filter: blur(5px);
+            z-index: 9999;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            transition: opacity 0.25s ease;
+        }
+
+        /* 燈箱彈出視窗：拉寬至 96vw，高度擴增至 94vh */
+        .modal-container {
+            position: relative;
+            width: 96vw;
+            max-width: 1500px;
+            height: 94vh;
+            background: #1e1e1e;
+            border-radius: 12px;
+            box-shadow: 0 12px 35px rgba(0, 0, 0, 0.7);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            transform: scale(0.95);
+            transition: transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .modal-header {
+            padding: 10px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #2b2b2b;
+            color: #fff;
+            font-size: 15px;
+            font-weight: bold;
+        }
+
+        .modal-close {
+            font-size: 24px;
+            color: #aaa;
             cursor: pointer;
+            line-height: 1;
+            transition: color 0.2s;
+        }
+
+        .modal-close:hover {
+            color: #ff5252;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+            opacity: 1;
+        }
+
+        .modal-overlay.active .modal-container {
+            transform: scale(1);
         }
     </style>
 </head>
@@ -107,12 +179,41 @@
         </tbody>
     </table>
 
+    <!-- 燈箱彈出視窗 -->
+    <div id="imageModal" class="modal-overlay" onclick="closeModal(event)">
+        <div class="modal-container" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <span id="modalCaption">作業截圖預覽</span>
+                <span class="modal-close" onclick="closeModal()">&times;</span>
+            </div>
+            <!-- 圖片顯示區域：去除外圍多餘 padding，最大化展示 -->
+            <div
+                style="flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; background: #0e0e0e; padding: 5px; overflow: hidden;">
+                <div id="modalLoading" style="color: #fff; font-size: 16px; margin-bottom: 10px;">⏳ 載入圖片...</div>
+                <img id="modalImg" src="" alt="作業原圖"
+                    style="display: none; width: auto; height: auto; max-width: 98%; max-height: 86vh; object-fit: contain; border-radius: 4px;">
+            </div>
+        </div>
+    </div>
+
     <script src="config.js"></script>
     <script>
         document.addEventListener("DOMContentLoaded", () => {
             initCourseDateSelect("queryDate");
             fetchRecords();
         });
+
+        // 擷取 Google 雲端檔案 ID
+        function getDriveFileId(url) {
+            if (!url) return null;
+            const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/) || url.match(/id=([a-zA-Z0-9_-]+)/);
+            return match ? match[1] : null;
+        }
+
+        // 小縮圖快速快取
+        function getDriveThumbUrl(fileId) {
+            return fileId ? `https://drive.google.com/thumbnail?id=${fileId}&sz=w200` : "";
+        }
 
         async function fetchRecords() {
             const date = document.getElementById("queryDate").value;
@@ -129,7 +230,6 @@
                 tbody.innerHTML = "";
                 let count = 0;
 
-                // 1. 先列出已存在靜態名單中的同學
                 const renderedIds = new Set();
                 Object.keys(STUDENTS).forEach(id => {
                     renderedIds.add(id);
@@ -139,42 +239,52 @@
                     const tr = document.createElement("tr");
                     if (record) {
                         count++;
-                        const thumbUrl = getDriveDirectThumbnailUrl(record.url);
+                        const fileId = getDriveFileId(record.url);
+                        const thumbUrl = getDriveThumbUrl(fileId);
+                        const info = `${student.name || student} (${id}) - 作業截圖`;
+
                         tr.innerHTML = `
-  <td>${id}</td>
-  <td>${record.className || student.className}</td>
-  <td>${student.name}</td>
-  <td class="tag-ok">✓ 已繳交</td>
-  <td>${record.time}</td>
-  <td><a href="${record.url}" target="_blank"><img src="${thumbUrl}" class="thumb" title="點擊檢視原圖"></a></td>
-`;
+                          <td>${id}</td>
+                          <td>${record.className || (student.className || "本班")}</td>
+                          <td>${student.name || student}</td>
+                          <td class="tag-ok">✓ 已繳交</td>
+                          <td>${record.time}</td>
+                          <td>
+                            <img src="${thumbUrl}" class="thumb" title="點擊放大" onclick="openModal('${fileId}', '${info}')">
+                          </td>
+                        `;
                     } else {
                         tr.innerHTML = `
-              <td>${id}</td>
-              <td>${student.className}</td>
-              <td>${student.name}</td>
-              <td class="tag-no">✕ 未繳交</td>
-              <td>-</td>
-              <td>-</td>
-            `;
+                          <td>${id}</td>
+                          <td>${student.className || "本班"}</td>
+                          <td>${student.name || student}</td>
+                          <td class="tag-no">✕ 未繳交</td>
+                          <td>-</td>
+                          <td>-</td>
+                        `;
                     }
                     tbody.appendChild(tr);
                 });
 
-                // 2. 額外追加「非靜態名單的手動上傳選修同學」
+                // 外系 / 選修同學
                 data.forEach(r => {
                     if (!renderedIds.has(String(r.studentId))) {
                         count++;
+                        const fileId = getDriveFileId(r.url);
+                        const thumbUrl = getDriveThumbUrl(fileId);
+                        const info = `${r.studentName} (${r.studentId}) - 作業截圖`;
+
                         const tr = document.createElement("tr");
-                        const thumbUrl = getDriveDirectThumbnailUrl(r.url);
                         tr.innerHTML = `
-  <td>${r.studentId}</td>
-  <td>${r.className} (外系/選修)</td>
-  <td>${r.studentName}</td>
-  <td class="tag-ok">✓ 已繳交</td>
-  <td>${r.time}</td>
-  <td><a href="${r.url}" target="_blank"><img src="${thumbUrl}" class="thumb" title="點擊檢視原圖"></a></td>
-`;
+                          <td>${r.studentId}</td>
+                          <td>${r.className} (外系/選修)</td>
+                          <td>${r.studentName}</td>
+                          <td class="tag-ok">✓ 已繳交</td>
+                          <td>${r.time}</td>
+                          <td>
+                            <img src="${thumbUrl}" class="thumb" title="點擊放大" onclick="openModal('${fileId}', '${info}')">
+                          </td>
+                        `;
                         tbody.appendChild(tr);
                     }
                 });
@@ -185,17 +295,70 @@
                 tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:red;">讀取失敗，請確認網路或 GAS 狀態！</td></tr>';
             }
         }
-        // 將 Google Drive 的檢視網址轉成直接顯示的縮圖網址
-        function getDriveDirectThumbnailUrl(url) {
-            if (!url) return "";
-            // 提取檔案 ID (從 /d/ 到下一個斜線，或 id= 後面的代碼)
-            const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/) || url.match(/id=([a-zA-Z0-9_-]+)/);
-            if (match && match[1]) {
-                // sz=w200 代表寬度縮至 200px (載入極速且可正常顯示)
-                return `https://drive.google.com/thumbnail?id=${match[1]}&sz=w200`;
+
+        // 快取已載入過的圖片 Base64，避免重複載入
+        const imageCache = {};
+
+        // 打開燈箱大圖（透過 GAS 取得 Base64，避開 Google 防盜鏈）
+        async function openModal(fileId, captionText) {
+            const modal = document.getElementById("imageModal");
+            const modalImg = document.getElementById("modalImg");
+            const modalLoading = document.getElementById("modalLoading");
+            const caption = document.getElementById("modalCaption");
+
+            caption.innerText = captionText;
+            modalImg.style.display = "none";
+            modalImg.src = "";
+            modalLoading.style.display = "block";
+            modalLoading.innerText = "⏳ 正在載入圖片...";
+
+            modal.style.display = "flex";
+            setTimeout(() => {
+                modal.classList.add("active");
+            }, 10);
+
+            try {
+                // 若快取已有，直接顯示
+                if (imageCache[fileId]) {
+                    modalImg.src = imageCache[fileId];
+                    modalLoading.style.display = "none";
+                    modalImg.style.display = "block";
+                    return;
+                }
+
+                // 向 GAS 請求圖片 Base64 資料
+                const res = await fetch(`${GAS_URL}?action=getImage&fileId=${fileId}`);
+                const data = await res.json();
+
+                if (data.status === "success" && data.base64Data) {
+                    imageCache[fileId] = data.base64Data;
+                    modalImg.src = data.base64Data;
+                    modalLoading.style.display = "none";
+                    modalImg.style.display = "block";
+                } else {
+                    modalLoading.innerText = "❌ 圖片載入失敗，雲端檔案可能已被移除！";
+                }
+            } catch (err) {
+                modalLoading.innerText = "❌ 載入逾時或網路異常，請稍後重試！";
             }
-            return url;
         }
+
+        // 關閉燈箱
+        function closeModal() {
+            const modal = document.getElementById("imageModal");
+            const modalImg = document.getElementById("modalImg");
+
+            modal.classList.remove("active");
+            setTimeout(() => {
+                modal.style.display = "none";
+                modalImg.src = "";
+            }, 250);
+        }
+
+        // 按 ESC 鍵關閉
+        document.addEventListener("keydown", (e) => {
+            if (e.key === "Escape") closeModal();
+        });
     </script>
 </body>
 

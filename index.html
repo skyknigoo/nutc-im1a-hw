@@ -1,35 +1,95 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
+
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>網路應用作業管理平台</title>
-  <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; padding: 15px; background: #eef2f6; }
-    .nav-tabs { max-width: 850px; margin: 0 auto 12px; display: flex; gap: 8px; }
-    .tab-btn { flex: 1; padding: 12px; font-size: 16px; border: none; background: #fff; border-radius: 8px; cursor: pointer; font-weight: bold; color: #555; transition: all 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
-    .tab-btn.active { background: #1976d2; color: #fff; }
-    .content-box { max-width: 850px; margin: 0 auto; height: 85vh; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
-    iframe { width: 100%; height: 100%; border: none; }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>網路應用作業管理平台</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            margin: 0;
+            padding: 12px 20px;
+            background: #f0f2f5;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* 頂部切換按鈕列 */
+        .nav-container {
+            width: 100%;
+            max-width: 1000px;
+            margin: 0 auto 10px;
+            display: flex;
+            gap: 12px;
+            flex-shrink: 0;
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 12px;
+            font-size: 16px;
+            border: none;
+            background: #fff;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            transition: background 0.2s, color 0.2s;
+        }
+
+        .tab-btn.active {
+            background: #1976d2;
+            color: #fff;
+        }
+
+        /* 主顯示區域 (iframe 容器) */
+        .frame-container {
+            width: 100%;
+            max-width: 1000px;
+            margin: 0 auto;
+            flex: 1; /* 自動填滿垂直剩餘空間 */
+            min-height: 85vh;
+            background: #fff;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+            display: block;
+        }
+    </style>
 </head>
+
 <body>
 
-  <div class="nav-tabs">
-    <button class="tab-btn active" onclick="switchPage('upload.html', this)">📤 作業上傳</button>
-    <button class="tab-btn" onclick="switchPage('view.html', this)">📋 作業完成清單預覽</button>
-  </div>
+    <!-- 頂部頁籤按鈕 (對應 .nav-container) -->
+    <div class="nav-container">
+        <button class="tab-btn active" onclick="switchPage('upload.html', this)">📤 作業上傳</button>
+        <button class="tab-btn" onclick="switchPage('view.html', this)">📋 作業完成清單預覽</button>
+    </div>
 
-  <div class="content-box">
-    <iframe id="mainFrame" src="upload.html"></iframe>
-  </div>
+    <!-- 內嵌頁面 (對應 .frame-container) -->
+    <div class="frame-container">
+        <iframe id="mainFrame" src="upload.html"></iframe>
+    </div>
 
-  <script>
-    function switchPage(pageUrl, btn) {
-      document.getElementById("mainFrame").src = pageUrl;
-      document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
-      btn.classList.add("active");
-    }
-  </script>
+    <script>
+        function switchPage(pageUrl, btn) {
+            document.getElementById("mainFrame").src = pageUrl;
+            document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+            btn.classList.add("active");
+        }
+    </script>
 </body>
+
 </html>
