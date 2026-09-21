@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>作業上傳</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            padding: 20px;
+            margin: 0;
+            background: #fff;
+            box-sizing: border-box;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        input[type="text"],
+        select,
+        input[type="file"] {
+            width: 100%;
+            padding: 10px;
+            font-size: 15px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            box-sizing: border-box;
+        }
+
+        #studentTip {
+            margin-top: 6px;
+            font-weight: bold;
+            font-size: 14px;
+            min-height: 20px;
+        }
+
+        #previewBox {
+            display: none;
+            margin-top: 10px;
+            text-align: center;
+        }
+
+        #previewBox img {
+            max-width: 100%;
+            border-radius: 6px;
+            border: 1px solid #ddd;
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            font-size: 16px;
+            font-weight: bold;
+            background: #1976d2;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        button:disabled {
+            background: #aaa;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="form-group">
+        <label for="courseDate">上課日期：</label>
+        <select id="courseDate"></select>
+    </div>
+
+    <div class="form-group">
+        <label for="studentId">學號（完整 10 碼）：</label>
+        <input type="text" id="studentId" maxlength="10" placeholder="例如：3311531001" autocomplete="off">
+        <div id="studentTip"></div>
+    </div>
+
+    <div class="form-group">
+        <label for="imageFile">選擇作業截圖：</label>
+        <input type="file" id="imageFile" accept="image/*">
+
+    </div>
+
+    <button id="submitBtn" onclick="submitHomework()">確認並送出繳交</button>
+    <div id="previewBox">
+        <img id="imagePreview" alt="作業截圖預覽">
+    </div>
+    <script src="config.js"></script>
+    <script>
+        let userIP = "未知";
+        let verifiedName = "";
+
+        // 取得 IP
+        fetch("https://api.ipify.org?format=json")
+            .then(res => res.json())
+            .then(data => { userIP = data.ip; })
+            .catch(() => { userIP = "獲取失敗"; });
+
+        // 初始化日期
+        document.addEventListener("DOMContentLoaded", () => {
+            initCourseDateSelect("courseDate");
+        });
+
+        // 驗證學號
+        const studentInput = document.getElementById("studentId");
+        const tip = document.getElementById("studentTip");
+        studentInput.addEventListener("input", (e) => {
+            const val = e.target.value.trim();
+            if (val.length === 10) {
+                if (STUDENTS[val]) {
+                    verifiedName = STUDENTS[val];
+                    tip.style.color = "#2e7d32";
+                    tip.innerText = `✓ 確認身分：${verifiedName} 同學`;
+                } else {
+                    verifiedName = "";
+                    tip.style.color = "#d32f2f";
+                    tip.innerText = "✕ 查無此學號，請重新確認！";
+                }
+            } else {
+                verifiedName = "";
+                tip.innerText = val.length > 0 ? `已輸入 ${val.length}/10 碼...` : "";
+            }
+        });
+
+        // 圖片預覽
+        const fileInput = document.getElementById("imageFile");
+        const previewBox = document.getElementById("previewBox");
+        const previewImg = document.getElementById("imagePreview");
+        fileInput.addEventListener("change", function () {
+            const file = this.files[0];
+            if (file) {
+                previewImg.src = URL.createObjectURL(file);
+                previewBox.style.display = "block";
+            } else {
+                previewBox.style.display = "none";
+            }
+        });
+
+        // 送出繳交
+        async function submitHomework() {
+            const id = studentInput.value.trim();
+            const date = document.getElementById("courseDate").value;
+            const btn = document.getElementById("submitBtn");
+
+            if (!STUDENTS[id] || !verifiedName) {
+                alert("請確認 10 碼學號是否正確無誤！");
+                return;
+            }
+            if (!fileInput.files.length) {
+                alert("請先選擇作業截圖！");
+                return;
+            }
+
+            const confirmMsg = `請確認作業資料：\n日期：${date}\n學號：${id}\n姓名：${verifiedName}\n\n確定送出嗎？`;
+            if (!confirm(confirmMsg)) return;
+
+            btn.disabled = true;
+            btn.innerText = "圖片轉檔與上傳中，請稍候...";
+
+            const reader = new FileReader();
+            reader.onload = async function () {
+                const payload = {
+                    courseDate: date,
+                    studentId: id,
+                    studentName: verifiedName,
+                    clientIP: userIP,
+                    image: reader.result
+                };
+
+                try {
+                    const res = await fetch(GAS_URL, {
+                        method: "POST",
+                        body: JSON.stringify(payload)
+                    });
+                    const result = await res.json();
+                    if (result.status === "success") {
+                        alert(`繳交成功！\n檔名：${result.fileName}`);
+                        location.reload();
+                    } else {
+                        alert("上傳失敗：" + result.message);
+                    }
+                } catch (err) {
+                    alert("資料已送出！請至小老師列表確認。");
+                    location.reload();
+                } finally {
+                    btn.disabled = false;
+                    btn.innerText = "確認並送出繳交";
+                }
+            };
+            reader.readAsDataURL(fileInput.files[0]);
+        }
+    </script>
+</body>
+
+</html>
