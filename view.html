@@ -139,14 +139,15 @@
                     const tr = document.createElement("tr");
                     if (record) {
                         count++;
+                        const thumbUrl = getDriveDirectThumbnailUrl(record.url);
                         tr.innerHTML = `
-              <td>${id}</td>
-              <td>${record.className || student.className}</td>
-              <td>${student.name}</td>
-              <td class="tag-ok">✓ 已繳交</td>
-              <td>${record.time}</td>
-              <td><a href="${record.url}" target="_blank"><img src="${record.url}" class="thumb" title="點擊檢視原圖"></a></td>
-            `;
+  <td>${id}</td>
+  <td>${record.className || student.className}</td>
+  <td>${student.name}</td>
+  <td class="tag-ok">✓ 已繳交</td>
+  <td>${record.time}</td>
+  <td><a href="${record.url}" target="_blank"><img src="${thumbUrl}" class="thumb" title="點擊檢視原圖"></a></td>
+`;
                     } else {
                         tr.innerHTML = `
               <td>${id}</td>
@@ -165,14 +166,15 @@
                     if (!renderedIds.has(String(r.studentId))) {
                         count++;
                         const tr = document.createElement("tr");
+                        const thumbUrl = getDriveDirectThumbnailUrl(r.url);
                         tr.innerHTML = `
-              <td>${r.studentId}</td>
-              <td>${r.className} (外系/選修)</td>
-              <td>${r.studentName}</td>
-              <td class="tag-ok">✓ 已繳交</td>
-              <td>${r.time}</td>
-              <td><a href="${r.url}" target="_blank"><img src="${r.url}" class="thumb" title="點擊檢視原圖"></a></td>
-            `;
+  <td>${r.studentId}</td>
+  <td>${r.className} (外系/選修)</td>
+  <td>${r.studentName}</td>
+  <td class="tag-ok">✓ 已繳交</td>
+  <td>${r.time}</td>
+  <td><a href="${r.url}" target="_blank"><img src="${thumbUrl}" class="thumb" title="點擊檢視原圖"></a></td>
+`;
                         tbody.appendChild(tr);
                     }
                 });
@@ -182,6 +184,17 @@
             } catch (e) {
                 tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:red;">讀取失敗，請確認網路或 GAS 狀態！</td></tr>';
             }
+        }
+        // 將 Google Drive 的檢視網址轉成直接顯示的縮圖網址
+        function getDriveDirectThumbnailUrl(url) {
+            if (!url) return "";
+            // 提取檔案 ID (從 /d/ 到下一個斜線，或 id= 後面的代碼)
+            const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/) || url.match(/id=([a-zA-Z0-9_-]+)/);
+            if (match && match[1]) {
+                // sz=w200 代表寬度縮至 200px (載入極速且可正常顯示)
+                return `https://drive.google.com/thumbnail?id=${match[1]}&sz=w200`;
+            }
+            return url;
         }
     </script>
 </body>
