@@ -96,7 +96,7 @@
 
         #previewBox img {
             max-width: 100%;
-            max-height: 240px;
+            max-height: 520px;
             border-radius: 6px;
             border: 1px solid #ddd;
             box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
@@ -141,9 +141,10 @@
     </div>
 
     <div class="form-group">
-        <label for="studentId">學號（完整 10 碼）：</label>
+        <label for="studentId">學號（完整 10 碼）： <sapn style="font-size:12px;color:#ff7979;">請不要填寫"非本人"學號 (會覆蓋掉作業 ! )</span></label> 
         <input type="text" id="studentId" maxlength="10" placeholder="例如：3311531001" autocomplete="off">
         <div id="studentTip"></div>
+        
     </div>
 
     <!-- 未在名冊中的同學手動補填框 -->
@@ -164,7 +165,7 @@
     <div class="form-group">
         <label>作業截圖（支援 Ctrl+V 貼上 / 檔案選取 / 拖曳）：</label>
         <div class="drop-zone" id="dropZone" onclick="triggerFileInput()">
-            <div class="drop-zone-text">📋 點擊選擇檔案，或直接按 <code>Ctrl + V</code> 貼上截圖</div>
+            <div class="drop-zone-text">點擊選擇檔案，或直接按 <code>Ctrl + V</code> 貼上截圖</div>
             <div class="drop-zone-subtext">也支援將圖片檔案拖曳至此處（自動轉為 JPG）</div>
             <!-- 隱藏原生檔案選取器，由點擊或程式觸發 -->
             <input type="file" id="imageFile" accept="image/*" style="display: none;">
@@ -277,9 +278,9 @@
                     
                     // 貼上成功時給予微提示
                     const originalText = dropZone.querySelector(".drop-zone-text").innerText;
-                    dropZone.querySelector(".drop-zone-text").innerText = "📋 已成功從剪貼簿貼上圖片！";
+                    dropZone.querySelector(".drop-zone-text").innerText = " 已成功從剪貼簿貼上圖片！";
                     setTimeout(() => {
-                        dropZone.querySelector(".drop-zone-text").innerHTML = "📋 點擊選擇檔案，或直接按 <code>Ctrl + V</code> 貼上截圖";
+                        dropZone.querySelector(".drop-zone-text").innerHTML = " 點擊選擇檔案，或直接按 <code>Ctrl + V</code> 貼上截圖";
                     }, 2500);
                     break;
                 }
