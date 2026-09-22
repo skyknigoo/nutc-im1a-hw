@@ -28,8 +28,7 @@
         }
 
         input[type="text"],
-        select,
-        input[type="file"] {
+        select {
             width: 100%;
             padding: 10px;
             font-size: 15px;
@@ -58,16 +57,49 @@
             margin-bottom: 0;
         }
 
+        /* 貼上與拖曳上傳框 */
+        .drop-zone {
+            border: 2px dashed #1976d2;
+            border-radius: 8px;
+            padding: 24px;
+            text-align: center;
+            background: #f8fbff;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        .drop-zone:hover,
+        .drop-zone.dragover {
+            background: #e3f2fd;
+            border-color: #0d47a1;
+        }
+
+        .drop-zone-text {
+            font-size: 15px;
+            color: #1976d2;
+            font-weight: bold;
+            line-height: 1.6;
+        }
+
+        .drop-zone-subtext {
+            font-size: 13px;
+            color: #666;
+            margin-top: 4px;
+        }
+
         #previewBox {
             display: none;
-            margin-top: 10px;
+            margin-top: 12px;
             text-align: center;
         }
 
         #previewBox img {
-            max-width: 960px;
+            max-width: 100%;
+            max-height: 240px;
             border-radius: 6px;
             border: 1px solid #ddd;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
         }
 
         button.submit-btn {
@@ -130,15 +162,22 @@
     </div>
 
     <div class="form-group">
-        <label for="imageFile">選擇作業截圖（自動轉檔為 JPG）：</label>
-        <input type="file" id="imageFile" accept="image/*">
+        <label>作業截圖（支援 Ctrl+V 貼上 / 檔案選取 / 拖曳）：</label>
+        <div class="drop-zone" id="dropZone" onclick="triggerFileInput()">
+            <div class="drop-zone-text">📋 點擊選擇檔案，或直接按 <code>Ctrl + V</code> 貼上截圖</div>
+            <div class="drop-zone-subtext">也支援將圖片檔案拖曳至此處（自動轉為 JPG）</div>
+            <!-- 隱藏原生檔案選取器，由點擊或程式觸發 -->
+            <input type="file" id="imageFile" accept="image/*" style="display: none;">
+        </div>
 
+        <div id="previewBox">
+            <img id="imagePreview" alt="作業截圖預覽">
+            <p style="font-size: 12px; color: #666; margin: 4px 0 0;">✓ 圖片已載入，可再次貼上或點擊替換</p>
+        </div>
     </div>
 
     <button id="submitBtn" class="submit-btn" onclick="submitHomework()">確認並送出繳交</button>
-    <div id="previewBox">
-        <img id="imagePreview" alt="作業截圖預覽">
-    </div>
+
     <script src="config.js"></script>
     <script>
         // 建立全域統一的靠頂彈窗
@@ -153,6 +192,7 @@
         let isManualInput = false;
         let currentStudentName = "";
         let currentClassName = "";
+        let currentImageBlob = null; // 儲存當前選取或貼上的圖片 Blob
 
         fetch("https://api.ipify.org?format=json")
             .then(res => res.json())
@@ -167,9 +207,16 @@
         const tip = document.getElementById("studentTip");
         const extraFields = document.getElementById("extraFields");
         const fileInput = document.getElementById("imageFile");
+        const dropZone = document.getElementById("dropZone");
         const previewBox = document.getElementById("previewBox");
         const previewImg = document.getElementById("imagePreview");
 
+        // 觸發隱藏的 file input
+        function triggerFileInput() {
+            fileInput.click();
+        }
+
+        // 監聽學號輸入：即時驗證名單
         studentInput.addEventListener("input", (e) => {
             const val = e.target.value.trim();
 
@@ -198,16 +245,67 @@
             }
         });
 
+        // 統一處理圖片顯示
+        function handleImageBlob(blob) {
+            currentImageBlob = blob;
+            previewImg.src = URL.createObjectURL(blob);
+            previewBox.style.display = "block";
+        }
+
+        // 1. 檔案選取上傳監聽
         fileInput.addEventListener("change", function () {
             const file = this.files[0];
             if (file) {
-                previewImg.src = URL.createObjectURL(file);
-                previewBox.style.display = "block";
-            } else {
-                previewBox.style.display = "none";
+                handleImageBlob(file);
             }
         });
 
+        // 2. 剪貼簿「複製貼上 (Ctrl+V)」監聽
+        window.addEventListener("paste", function (e) {
+            // 如果游標正在打字（學號或姓名欄位），避免誤攔截文字貼上
+            if (e.target.tagName === "INPUT" && e.target.type === "text") {
+                // 如果剪貼簿裡不是圖片，就放行一般文字貼上
+                const hasImage = Array.from(e.clipboardData.items).some(item => item.type.indexOf("image") !== -1);
+                if (!hasImage) return;
+            }
+
+            const items = (e.clipboardData || window.clipboardData).items;
+            for (let i = 0; i < items.length; i++) {
+                if (items[i].type.indexOf("image") !== -1) {
+                    const blob = items[i].getAsFile();
+                    handleImageBlob(blob);
+                    
+                    // 貼上成功時給予微提示
+                    const originalText = dropZone.querySelector(".drop-zone-text").innerText;
+                    dropZone.querySelector(".drop-zone-text").innerText = "📋 已成功從剪貼簿貼上圖片！";
+                    setTimeout(() => {
+                        dropZone.querySelector(".drop-zone-text").innerHTML = "📋 點擊選擇檔案，或直接按 <code>Ctrl + V</code> 貼上截圖";
+                    }, 2500);
+                    break;
+                }
+            }
+        });
+
+        // 3. 拖曳檔案支援 (Drag & Drop)
+        dropZone.addEventListener("dragover", (e) => {
+            e.preventDefault();
+            dropZone.classList.add("dragover");
+        });
+
+        dropZone.addEventListener("dragleave", () => {
+            dropZone.classList.remove("dragover");
+        });
+
+        dropZone.addEventListener("drop", (e) => {
+            e.preventDefault();
+            dropZone.classList.remove("dragover");
+            const file = e.dataTransfer.files[0];
+            if (file && file.type.startsWith("image/")) {
+                handleImageBlob(file);
+            }
+        });
+
+        // 送出繳交作業
         async function submitHomework() {
             const id = studentInput.value.trim();
             const date = document.getElementById("courseDate").value;
@@ -247,11 +345,12 @@
                 }
             }
 
-            if (!fileInput.files.length) {
+            // 檢查是否有選取或貼上圖片
+            if (!currentImageBlob) {
                 MySwal.fire({
                     icon: "warning",
-                    title: "請選擇截圖",
-                    text: "請先選擇欲繳交的作業截圖檔案！",
+                    title: "請提供作業截圖",
+                    text: "請選擇圖片檔案，或按 Ctrl+V 貼上截圖！",
                     confirmButtonColor: "#1976d2"
                 });
                 return;
@@ -293,7 +392,6 @@
 
             btn.disabled = true;
 
-            const file = fileInput.files[0];
             const img = new Image();
             const reader = new FileReader();
 
@@ -360,7 +458,7 @@
                     }
                 };
             };
-            reader.readAsDataURL(file);
+            reader.readAsDataURL(currentImageBlob);
         }
     </script>
 </body>
