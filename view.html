@@ -35,6 +35,10 @@
             cursor: pointer;
         }
 
+        button:hover {
+            background: #1565c0;
+        }
+
         .stats {
             font-weight: bold;
             margin-bottom: 12px;
@@ -56,6 +60,30 @@
 
         th {
             background: #f5f5f5;
+            user-select: none;
+        }
+
+        /* 可排序的表頭樣式 */
+        th.sortable {
+            cursor: pointer;
+            position: relative;
+            padding-right: 22px;
+            transition: background-color 0.2s;
+        }
+
+        th.sortable:hover {
+            background-color: #e0e0e0;
+        }
+
+        .sort-icon {
+            font-size: 12px;
+            color: #888;
+            margin-left: 4px;
+        }
+
+        th.sortable.active .sort-icon {
+            color: #1976d2;
+            font-weight: bold;
         }
 
         .tag-ok {
@@ -68,7 +96,7 @@
             font-weight: bold;
         }
 
-        /* 縮圖樣式與懸停微動效 */
+        /* 縮圖樣式與懸停動效 */
         .thumb {
             max-width: 80px;
             max-height: 48px;
@@ -101,7 +129,6 @@
             transition: opacity 0.25s ease;
         }
 
-        /* 燈箱彈出視窗：拉寬至 96vw，高度擴增至 94vh */
         .modal-container {
             position: relative;
             width: 96vw;
@@ -164,10 +191,14 @@
     <table>
         <thead>
             <tr>
-                <th>學號</th>
+                <th class="sortable" onclick="sortTable('studentId')">
+                    學號 <span id="icon-studentId" class="sort-icon">⇅</span>
+                </th>
                 <th>班級</th>
                 <th>姓名</th>
-                <th>狀態</th>
+                <th class="sortable" onclick="sortTable('status')">
+                    狀態 <span id="icon-status" class="sort-icon">⇅</span>
+                </th>
                 <th>繳交時間</th>
                 <th>截圖預覽</th>
             </tr>
@@ -186,9 +217,7 @@
                 <span id="modalCaption">作業截圖預覽</span>
                 <span class="modal-close" onclick="closeModal()">&times;</span>
             </div>
-            <!-- 圖片顯示區域：去除外圍多餘 padding，最大化展示 -->
-            <div
-                style="flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; background: #0e0e0e; padding: 5px; overflow: hidden;">
+            <div style="flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; background: #0e0e0e; padding: 5px; overflow: hidden;">
                 <div id="modalLoading" style="color: #fff; font-size: 16px; margin-bottom: 10px;">⏳ 載入圖片...</div>
                 <img id="modalImg" src="" alt="作業原圖"
                     style="display: none; width: auto; height: auto; max-width: 98%; max-height: 86vh; object-fit: contain; border-radius: 4px;">
@@ -198,19 +227,25 @@
 
     <script src="config.js"></script>
     <script>
+        // 暫存當前查詢到的所有清單資料
+        let currentList = [];
+        // 排序狀態管理
+        let sortConfig = {
+            column: "studentId", // 預設依學號
+            direction: "asc"     // 'asc' 或 'desc'
+        };
+
         document.addEventListener("DOMContentLoaded", () => {
             initCourseDateSelect("queryDate");
             fetchRecords();
         });
 
-        // 擷取 Google 雲端檔案 ID
         function getDriveFileId(url) {
             if (!url) return null;
             const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/) || url.match(/id=([a-zA-Z0-9_-]+)/);
             return match ? match[1] : null;
         }
 
-        // 小縮圖快速快取
         function getDriveThumbUrl(fileId) {
             return fileId ? `https://drive.google.com/thumbnail?id=${fileId}&sz=w200` : "";
         }
@@ -227,79 +262,170 @@
                 const res = await fetch(`${GAS_URL}?date=${date}`);
                 const data = await res.json();
 
-                tbody.innerHTML = "";
+                currentList = [];
                 let count = 0;
-
                 const renderedIds = new Set();
+
+                // 1. 處理本班名冊
                 Object.keys(STUDENTS).forEach(id => {
-                    renderedIds.add(id);
+                    renderedIds.add(String(id));
                     const student = STUDENTS[id];
                     const record = data.find(r => String(r.studentId) === String(id));
 
-                    const tr = document.createElement("tr");
                     if (record) {
                         count++;
                         const fileId = getDriveFileId(record.url);
-                        const thumbUrl = getDriveThumbUrl(fileId);
-                        const info = `${student.name || student} (${id}) - 作業截圖`;
-
-                        tr.innerHTML = `
-                          <td>${id}</td>
-                          <td>${record.className || (student.className || "本班")}</td>
-                          <td>${student.name || student}</td>
-                          <td class="tag-ok">✓ 已繳交</td>
-                          <td>${record.time}</td>
-                          <td>
-                            <img src="${thumbUrl}" class="thumb" title="點擊放大" onclick="openModal('${fileId}', '${info}')">
-                          </td>
-                        `;
+                        currentList.push({
+                            studentId: String(id),
+                            className: record.className || (student.className || "本班"),
+                            name: student.name || student,
+                            isDone: true,
+                            time: record.time,
+                            fileId: fileId,
+                            url: record.url
+                        });
                     } else {
-                        tr.innerHTML = `
-                          <td>${id}</td>
-                          <td>${student.className || "本班"}</td>
-                          <td>${student.name || student}</td>
-                          <td class="tag-no">✕ 未繳交</td>
-                          <td>-</td>
-                          <td>-</td>
-                        `;
+                        currentList.push({
+                            studentId: String(id),
+                            className: student.className || "本班",
+                            name: student.name || student,
+                            isDone: false,
+                            time: "-",
+                            fileId: null,
+                            url: null
+                        });
                     }
-                    tbody.appendChild(tr);
                 });
 
-                // 外系 / 選修同學
+                // 2. 處理外系 / 選修自訂同學
                 data.forEach(r => {
-                    if (!renderedIds.has(String(r.studentId))) {
+                    const sId = String(r.studentId);
+                    if (!renderedIds.has(sId)) {
                         count++;
                         const fileId = getDriveFileId(r.url);
-                        const thumbUrl = getDriveThumbUrl(fileId);
-                        const info = `${r.studentName} (${r.studentId}) - 作業截圖`;
-
-                        const tr = document.createElement("tr");
-                        tr.innerHTML = `
-                          <td>${r.studentId}</td>
-                          <td>${r.className} (外系/選修)</td>
-                          <td>${r.studentName}</td>
-                          <td class="tag-ok">✓ 已繳交</td>
-                          <td>${r.time}</td>
-                          <td>
-                            <img src="${thumbUrl}" class="thumb" title="點擊放大" onclick="openModal('${fileId}', '${info}')">
-                          </td>
-                        `;
-                        tbody.appendChild(tr);
+                        currentList.push({
+                            studentId: sId,
+                            className: `${r.className || "其他"} (外系/選修)`,
+                            name: r.studentName,
+                            isDone: true,
+                            time: r.time,
+                            fileId: fileId,
+                            url: r.url
+                        });
                     }
                 });
 
                 const totalExpected = Object.keys(STUDENTS).length;
                 stats.innerText = `【${date}】 實收作業：${count} 份（本班預期應收 ${totalExpected} 人）`;
+
+                // 執行排序並渲染表格
+                applySortAndRender();
+
             } catch (e) {
                 tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:red;">讀取失敗，請確認網路或 GAS 狀態！</td></tr>';
             }
         }
 
-        // 快取已載入過的圖片 Base64，避免重複載入
+        // 點擊表頭切換排序
+        function sortTable(column) {
+            if (sortConfig.column === column) {
+                // 若點擊同一個欄位，切換 升冪 <-> 降冪
+                sortConfig.direction = sortConfig.direction === "asc" ? "desc" : "asc";
+            } else {
+                // 點擊新欄位，預設從升冪開始
+                sortConfig.column = column;
+                sortConfig.direction = "asc";
+            }
+
+            applySortAndRender();
+        }
+
+        // 執行排序邏輯並重繪畫面
+        function applySortAndRender() {
+            if (!currentList.length) return;
+
+            // 1. 陣列排序
+            currentList.sort((a, b) => {
+                let comparison = 0;
+
+                if (sortConfig.column === "studentId") {
+                    // 學號排序 (比對字串或數值)
+                    comparison = a.studentId.localeCompare(b.studentId, undefined, { numeric: true });
+                } else if (sortConfig.column === "status") {
+                    // 狀態排序：已繳交 (true) vs 未繳交 (false)
+                    comparison = (b.isDone === true ? 1 : 0) - (a.isDone === true ? 1 : 0);
+                    // 狀態若相同，次要排序條件為學號升冪
+                    if (comparison === 0) {
+                        return a.studentId.localeCompare(b.studentId, undefined, { numeric: true });
+                    }
+                }
+
+                return sortConfig.direction === "asc" ? comparison : -comparison;
+            });
+
+            // 2. 更新表頭圖示
+            updateSortIcons();
+
+            // 3. 渲染 Table 內容
+            const tbody = document.getElementById("recordTable");
+            tbody.innerHTML = "";
+
+            currentList.forEach(item => {
+                const tr = document.createElement("tr");
+
+                if (item.isDone) {
+                    const thumbUrl = getDriveThumbUrl(item.fileId);
+                    const info = `${item.name} (${item.studentId}) - 作業截圖`;
+                    tr.innerHTML = `
+                        <td>${item.studentId}</td>
+                        <td>${item.className}</td>
+                        <td>${item.name}</td>
+                        <td class="tag-ok">✓ 已繳交</td>
+                        <td>${item.time}</td>
+                        <td>
+                            <img src="${thumbUrl}" class="thumb" title="點擊放大" onclick="openModal('${item.fileId}', '${info}')">
+                        </td>
+                    `;
+                } else {
+                    tr.innerHTML = `
+                        <td>${item.studentId}</td>
+                        <td>${item.className}</td>
+                        <td>${item.name}</td>
+                        <td class="tag-no">✕ 未繳交</td>
+                        <td>-</td>
+                        <td>-</td>
+                    `;
+                }
+                tbody.appendChild(tr);
+            });
+        }
+
+        // 更新箭頭樣式
+        function updateSortIcons() {
+            const idIcon = document.getElementById("icon-studentId");
+            const statusIcon = document.getElementById("icon-status");
+
+            // 重設全部為 ⇅
+            idIcon.innerText = "⇅";
+            statusIcon.innerText = "⇅";
+            idIcon.parentElement.classList.remove("active");
+            statusIcon.parentElement.classList.remove("active");
+
+            // 當前選取的欄位亮起並標示升/降冪
+            const arrow = sortConfig.direction === "asc" ? "▲" : "▼";
+            if (sortConfig.column === "studentId") {
+                idIcon.innerText = arrow;
+                idIcon.parentElement.classList.add("active");
+            } else if (sortConfig.column === "status") {
+                statusIcon.innerText = arrow;
+                statusIcon.parentElement.classList.add("active");
+            }
+        }
+
+        // 快取已載入過的圖片 Base64
         const imageCache = {};
 
-        // 打開燈箱大圖（透過 GAS 取得 Base64，避開 Google 防盜鏈）
+        // 打開燈箱大圖
         async function openModal(fileId, captionText) {
             const modal = document.getElementById("imageModal");
             const modalImg = document.getElementById("modalImg");
@@ -318,7 +444,6 @@
             }, 10);
 
             try {
-                // 若快取已有，直接顯示
                 if (imageCache[fileId]) {
                     modalImg.src = imageCache[fileId];
                     modalLoading.style.display = "none";
@@ -326,7 +451,6 @@
                     return;
                 }
 
-                // 向 GAS 請求圖片 Base64 資料
                 const res = await fetch(`${GAS_URL}?action=getImage&fileId=${fileId}`);
                 const data = await res.json();
 
