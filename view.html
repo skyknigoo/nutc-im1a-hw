@@ -4,485 +4,299 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>作業清單查閱</title>
+    <title>作業完成清單預覽</title>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
         body {
             font-family: sans-serif;
             padding: 20px;
             margin: 0;
             background: #fff;
+            box-sizing: border-box;
         }
 
-        .toolbar {
+        .header-bar {
             display: flex;
-            gap: 10px;
+            justify-content: space-between;
             align-items: center;
-            margin-bottom: 12px;
+            margin-bottom: 20px;
+            background: #f8fbff;
+            border: 1px solid #bbdefb;
+            padding: 15px;
+            border-radius: 8px;
         }
 
-        select,
-        button {
-            padding: 8px 12px;
-            font-size: 15px;
-            border-radius: 4px;
-            border: 1px solid #ccc;
+        .filter-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
 
-        button {
-            background: #1976d2;
-            color: #fff;
-            border: none;
-            cursor: pointer;
-        }
-
-        button:hover {
-            background: #1565c0;
-        }
-
-        .stats {
+        label {
             font-weight: bold;
-            margin-bottom: 12px;
-            font-size: 15px;
+            color: #333;
+            font-size: 14px;
+        }
+
+        select, input[type="text"] {
+            padding: 8px 12px;
+            font-size: 14px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            box-sizing: border-box;
+        }
+
+        .stats-badge {
+            background: #2c3e50;
+            color: #fff;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: bold;
+        }
+
+        /* 表格樣式 */
+        .table-container {
+            width: 100%;
+            overflow-x: auto;
+            border: 1px solid #cbd5e0;
+            border-radius: 8px;
+            background: #fff;
         }
 
         table {
             width: 100%;
             border-collapse: collapse;
-        }
-
-        th,
-        td {
-            border: 1px solid #ddd;
-            padding: 8px 10px;
             text-align: left;
             font-size: 14px;
         }
 
+        th, td {
+            padding: 12px 16px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
         th {
-            background: #f5f5f5;
-            user-select: none;
-        }
-
-        /* 可排序的表頭樣式 */
-        th.sortable {
-            cursor: pointer;
-            position: relative;
-            padding-right: 22px;
-            transition: background-color 0.2s;
-        }
-
-        th.sortable:hover {
-            background-color: #e0e0e0;
-        }
-
-        .sort-icon {
-            font-size: 12px;
-            color: #888;
-            margin-left: 4px;
-        }
-
-        th.sortable.active .sort-icon {
-            color: #1976d2;
+            background: #2c3e50;
+            color: #fff;
             font-weight: bold;
+            white-space: nowrap;
         }
 
-        .tag-ok {
+        tr {
+            transition: background-color 0.3s ease;
+        }
+
+        tr:hover {
+            background: #f8fafc;
+        }
+
+        /* 點擊預覽後的凸顯樣式（黃色柔和高亮與左側粗邊框提示） */
+        tr.highlight-row {
+            background-color: #fffde7 !important;
+            box-shadow: inset 4px 0 0 #fbc02d;
+        }
+
+        .status-checked {
             color: #2e7d32;
             font-weight: bold;
+            text-align: center;
+            font-size: 16px;
         }
 
-        .tag-no {
-            color: #d32f2f;
+        .status-unchecked {
+            color: #cbd5e0;
+            text-align: center;
+            font-size: 16px;
+        }
+
+        .url-cell {
+            max-width: 300px;
+            word-break: break-all;
+        }
+
+        .url-cell a {
+            color: #1976d2;
+            text-decoration: none;
             font-weight: bold;
-        }
-
-        /* 縮圖樣式與懸停動效 */
-        .thumb {
-            max-width: 80px;
-            max-height: 48px;
-            border-radius: 4px;
-            border: 1px solid #ccc;
-            vertical-align: middle;
-            cursor: zoom-in;
-            transition: transform 0.2s, box-shadow 0.2s;
-        }
-
-        .thumb:hover {
-            transform: scale(1.08);
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
-        }
-
-        /* 燈箱背景遮罩 */
-        .modal-overlay {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100vw;
-            height: 100vh;
-            background: rgba(0, 0, 0, 0.82);
-            backdrop-filter: blur(5px);
-            z-index: 9999;
-            justify-content: center;
-            align-items: center;
-            opacity: 0;
-            transition: opacity 0.25s ease;
-        }
-
-        .modal-container {
-            position: relative;
-            width: 96vw;
-            max-width: 1500px;
-            height: 94vh;
-            background: #1e1e1e;
-            border-radius: 12px;
-            box-shadow: 0 12px 35px rgba(0, 0, 0, 0.7);
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-            transform: scale(0.95);
-            transition: transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-        }
-
-        .modal-header {
-            padding: 10px 16px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            background: #2b2b2b;
-            color: #fff;
-            font-size: 15px;
-            font-weight: bold;
-        }
-
-        .modal-close {
-            font-size: 24px;
-            color: #aaa;
             cursor: pointer;
-            line-height: 1;
-            transition: color 0.2s;
         }
 
-        .modal-close:hover {
-            color: #ff5252;
+        .url-cell a:hover {
+            text-decoration: underline;
         }
 
-        .modal-overlay.active {
-            display: flex;
-            opacity: 1;
+        .loading-text {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+            font-size: 15px;
         }
 
-        .modal-overlay.active .modal-container {
-            transform: scale(1);
+        .custom-top-swal {
+            margin-top: 45px !important;
+            border-radius: 12px !important;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25) !important;
         }
     </style>
 </head>
 
 <body>
 
-    <div class="toolbar">
-        <label for="queryDate"><strong>日期：</strong></label>
-        <select id="queryDate"></select>
-        <button onclick="fetchRecords()">查詢 / 重新整理</button>
+    <div class="header-bar">
+        <div class="filter-group">
+            <label for="viewDateSelect">選擇上課日期：</label>
+            <select id="viewDateSelect" onchange="loadRecordsForDate(this.value)"></select>
+        </div>
+        <div class="filter-group">
+            <input type="text" id="searchInput" placeholder="搜尋學號或姓名..." oninput="filterTable()">
+            <div id="statsBadge" class="stats-badge">已繳交：0 / 0 人</div>
+        </div>
     </div>
 
-    <div class="stats" id="statsBar">請點擊查詢以載入資料</div>
-
-    <table>
-        <thead>
-            <tr>
-                <th class="sortable" onclick="sortTable('studentId')">
-                    學號 <span id="icon-studentId" class="sort-icon">⇅</span>
-                </th>
-                <th>班級</th>
-                <th>姓名</th>
-                <th class="sortable" onclick="sortTable('status')">
-                    狀態 <span id="icon-status" class="sort-icon">⇅</span>
-                </th>
-                <th>繳交時間</th>
-                <th>截圖預覽</th>
-            </tr>
-        </thead>
-        <tbody id="recordTable">
-            <tr>
-                <td colspan="6" style="text-align:center; color:#888;">尚未載入資料</td>
-            </tr>
-        </tbody>
-    </table>
-
-    <!-- 燈箱彈出視窗 -->
-    <div id="imageModal" class="modal-overlay" onclick="closeModal(event)">
-        <div class="modal-container" onclick="event.stopPropagation()">
-            <div class="modal-header">
-                <span id="modalCaption">作業截圖預覽</span>
-                <span class="modal-close" onclick="closeModal()">&times;</span>
-            </div>
-            <div style="flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; background: #0e0e0e; padding: 5px; overflow: hidden;">
-                <div id="modalLoading" style="color: #fff; font-size: 16px; margin-bottom: 10px;">⏳ 載入圖片...</div>
-                <img id="modalImg" src="" alt="作業原圖"
-                    style="display: none; width: auto; height: auto; max-width: 98%; max-height: 86vh; object-fit: contain; border-radius: 4px;">
-            </div>
-        </div>
+    <div class="table-container">
+        <table id="recordsTable">
+            <thead>
+                <tr>
+                    <th style="width: 80px; text-align: center;">狀態</th>
+                    <th style="width: 120px;">學號</th>
+                    <th style="width: 100px;">姓名</th>
+                    <th style="width: 100px;">班級</th>
+                    <th>繳交網址 (點擊預覽)</th>
+                    <th style="width: 160px;">最後繳交時間</th>
+                </tr>
+            </thead>
+            <tbody id="tableBody">
+                <tr>
+                    <td colspan="6" class="loading-text">⏳ 正在從雲端載入學生名冊與繳交紀錄...</td>
+                </tr>
+            </tbody>
+        </table>
     </div>
 
     <script src="config.js"></script>
     <script>
-        // 暫存當前查詢到的所有清單資料
-        let currentList = [];
-        // 排序狀態管理
-        let sortConfig = {
-            column: "studentId", // 預設依學號
-            direction: "asc"     // 'asc' 或 'desc'
-        };
+        let allStudents = {};
+        let currentRecordsMap = {};
 
-        document.addEventListener("DOMContentLoaded", () => {
-            initCourseDateSelect("queryDate");
-            fetchRecords();
+        document.addEventListener("DOMContentLoaded", async () => {
+            initCourseDateSelect("viewDateSelect");
+            
+            const students = await loadStudentsFromSheet();
+            allStudents = students;
+
+            const selectEl = document.getElementById("viewDateSelect");
+            if (selectEl && selectEl.value) {
+                loadRecordsForDate(selectEl.value);
+            } else {
+                document.getElementById("tableBody").innerHTML = `<tr><td colspan="6" class="loading-text">目前尚無開放的上課日期記錄。</td></tr>`;
+            }
         });
 
-        function getDriveFileId(url) {
-            if (!url) return null;
-            const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/) || url.match(/id=([a-zA-Z0-9_-]+)/);
-            return match ? match[1] : null;
-        }
+        async function loadRecordsForDate(dateStr) {
+            if (!dateStr) return;
 
-        function getDriveThumbUrl(fileId) {
-            return fileId ? `https://drive.google.com/thumbnail?id=${fileId}&sz=w200` : "";
-        }
-
-        async function fetchRecords() {
-            const date = document.getElementById("queryDate").value;
-            const tbody = document.getElementById("recordTable");
-            const stats = document.getElementById("statsBar");
-
-            if (!date) return;
-            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">資料載入中...</td></tr>';
+            document.getElementById("tableBody").innerHTML = `<tr><td colspan="6" class="loading-text">⏳ 正在讀取 ${dateStr} 的繳交紀錄...</td></tr>`;
 
             try {
-                const res = await fetch(`${GAS_URL}?date=${date}`);
+                const res = await fetch(`${GAS_URL}?date=${dateStr}`);
                 const data = await res.json();
 
-                currentList = [];
-                let count = 0;
-                const renderedIds = new Set();
+                if (data.status === "success") {
+                    if (data.students) {
+                        allStudents = data.students;
+                    }
 
-                // 1. 處理本班名冊
-                Object.keys(STUDENTS).forEach(id => {
-                    renderedIds.add(String(id));
-                    const student = STUDENTS[id];
-                    const record = data.find(r => String(r.studentId) === String(id));
-
-                    if (record) {
-                        count++;
-                        const fileId = getDriveFileId(record.url);
-                        currentList.push({
-                            studentId: String(id),
-                            className: record.className || (student.className || "本班"),
-                            name: student.name || student,
-                            isDone: true,
-                            time: record.time,
-                            fileId: fileId,
-                            url: record.url
-                        });
-                    } else {
-                        currentList.push({
-                            studentId: String(id),
-                            className: student.className || "本班",
-                            name: student.name || student,
-                            isDone: false,
-                            time: "-",
-                            fileId: null,
-                            url: null
+                    currentRecordsMap = {};
+                    if (data.records && Array.isArray(data.records)) {
+                        data.records.forEach(r => {
+                            currentRecordsMap[String(r.studentId).trim()] = r;
                         });
                     }
-                });
 
-                // 2. 處理外系 / 選修自訂同學
-                data.forEach(r => {
-                    const sId = String(r.studentId);
-                    if (!renderedIds.has(sId)) {
-                        count++;
-                        const fileId = getDriveFileId(r.url);
-                        currentList.push({
-                            studentId: sId,
-                            className: `${r.className || "其他"} (外系/選修)`,
-                            name: r.studentName,
-                            isDone: true,
-                            time: r.time,
-                            fileId: fileId,
-                            url: r.url
-                        });
-                    }
-                });
-
-                const totalExpected = Object.keys(STUDENTS).length;
-                stats.innerText = `【${date}】 實收作業：${count} 份（本班預期應收 ${totalExpected} 人）`;
-
-                // 執行排序並渲染表格
-                applySortAndRender();
-
-            } catch (e) {
-                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:red;">讀取失敗，請確認網路或 GAS 狀態！</td></tr>';
-            }
-        }
-
-        // 點擊表頭切換排序
-        function sortTable(column) {
-            if (sortConfig.column === column) {
-                // 若點擊同一個欄位，切換 升冪 <-> 降冪
-                sortConfig.direction = sortConfig.direction === "asc" ? "desc" : "asc";
-            } else {
-                // 點擊新欄位，預設從升冪開始
-                sortConfig.column = column;
-                sortConfig.direction = "asc";
-            }
-
-            applySortAndRender();
-        }
-
-        // 執行排序邏輯並重繪畫面
-        function applySortAndRender() {
-            if (!currentList.length) return;
-
-            // 1. 陣列排序
-            currentList.sort((a, b) => {
-                let comparison = 0;
-
-                if (sortConfig.column === "studentId") {
-                    // 學號排序 (比對字串或數值)
-                    comparison = a.studentId.localeCompare(b.studentId, undefined, { numeric: true });
-                } else if (sortConfig.column === "status") {
-                    // 狀態排序：已繳交 (true) vs 未繳交 (false)
-                    comparison = (b.isDone === true ? 1 : 0) - (a.isDone === true ? 1 : 0);
-                    // 狀態若相同，次要排序條件為學號升冪
-                    if (comparison === 0) {
-                        return a.studentId.localeCompare(b.studentId, undefined, { numeric: true });
-                    }
+                    renderTable();
+                } else {
+                    document.getElementById("tableBody").innerHTML = `<tr><td colspan="6" class="loading-text" style="color:#d32f2f;">載入失敗：${data.message || "未知錯誤"}</td></tr>`;
                 }
+            } catch (err) {
+                document.getElementById("tableBody").innerHTML = `<tr><td colspan="6" class="loading-text" style="color:#d32f2f;">連線伺服器發生錯誤</td></tr>`;
+            }
+        }
 
-                return sortConfig.direction === "asc" ? comparison : -comparison;
-            });
-
-            // 2. 更新表頭圖示
-            updateSortIcons();
-
-            // 3. 渲染 Table 內容
-            const tbody = document.getElementById("recordTable");
+        function renderTable() {
+            const tbody = document.getElementById("tableBody");
+            const filterKeyword = document.getElementById("searchInput").value.trim().toLowerCase();
             tbody.innerHTML = "";
 
-            currentList.forEach(item => {
-                const tr = document.createElement("tr");
+            const studentIds = Object.keys(allStudents).sort();
+            let submittedCount = 0;
+            let totalCount = studentIds.length;
 
-                if (item.isDone) {
-                    const thumbUrl = getDriveThumbUrl(item.fileId);
-                    const info = `${item.name} (${item.studentId}) - 作業截圖`;
-                    tr.innerHTML = `
-                        <td>${item.studentId}</td>
-                        <td>${item.className}</td>
-                        <td>${item.name}</td>
-                        <td class="tag-ok">✓ 已繳交</td>
-                        <td>${item.time}</td>
-                        <td>
-                            <img src="${thumbUrl}" class="thumb" title="點擊放大" onclick="openModal('${item.fileId}', '${info}')">
-                        </td>
-                    `;
-                } else {
-                    tr.innerHTML = `
-                        <td>${item.studentId}</td>
-                        <td>${item.className}</td>
-                        <td>${item.name}</td>
-                        <td class="tag-no">✕ 未繳交</td>
-                        <td>-</td>
-                        <td>-</td>
-                    `;
-                }
-                tbody.appendChild(tr);
-            });
-        }
-
-        // 更新箭頭樣式
-        function updateSortIcons() {
-            const idIcon = document.getElementById("icon-studentId");
-            const statusIcon = document.getElementById("icon-status");
-
-            // 重設全部為 ⇅
-            idIcon.innerText = "⇅";
-            statusIcon.innerText = "⇅";
-            idIcon.parentElement.classList.remove("active");
-            statusIcon.parentElement.classList.remove("active");
-
-            // 當前選取的欄位亮起並標示升/降冪
-            const arrow = sortConfig.direction === "asc" ? "▲" : "▼";
-            if (sortConfig.column === "studentId") {
-                idIcon.innerText = arrow;
-                idIcon.parentElement.classList.add("active");
-            } else if (sortConfig.column === "status") {
-                statusIcon.innerText = arrow;
-                statusIcon.parentElement.classList.add("active");
+            if (totalCount === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="loading-text">「同學資料表」中目前沒有學生資料。</td></tr>`;
+                document.getElementById("statsBadge").innerText = `已繳交：0 / 0 人`;
+                return;
             }
-        }
 
-        // 快取已載入過的圖片 Base64
-        const imageCache = {};
+            studentIds.forEach(sId => {
+                const sInfo = allStudents[sId];
+                const sName = sInfo.name || "";
+                const sClass = sInfo.className || "";
 
-        // 打開燈箱大圖
-        async function openModal(fileId, captionText) {
-            const modal = document.getElementById("imageModal");
-            const modalImg = document.getElementById("modalImg");
-            const modalLoading = document.getElementById("modalLoading");
-            const caption = document.getElementById("modalCaption");
-
-            caption.innerText = captionText;
-            modalImg.style.display = "none";
-            modalImg.src = "";
-            modalLoading.style.display = "block";
-            modalLoading.innerText = "⏳ 正在載入圖片...";
-
-            modal.style.display = "flex";
-            setTimeout(() => {
-                modal.classList.add("active");
-            }, 10);
-
-            try {
-                if (imageCache[fileId]) {
-                    modalImg.src = imageCache[fileId];
-                    modalLoading.style.display = "none";
-                    modalImg.style.display = "block";
+                if (filterKeyword && !sId.toLowerCase().includes(filterKeyword) && !sName.toLowerCase().includes(filterKeyword)) {
                     return;
                 }
 
-                const res = await fetch(`${GAS_URL}?action=getImage&fileId=${fileId}`);
-                const data = await res.json();
+                const record = currentRecordsMap[sId];
+                const isSubmitted = !!record && !!record.url;
+                if (isSubmitted) submittedCount++;
 
-                if (data.status === "success" && data.base64Data) {
-                    imageCache[fileId] = data.base64Data;
-                    modalImg.src = data.base64Data;
-                    modalLoading.style.display = "none";
-                    modalImg.style.display = "block";
-                } else {
-                    modalLoading.innerText = "❌ 圖片載入失敗，雲端檔案可能已被移除！";
-                }
-            } catch (err) {
-                modalLoading.innerText = "❌ 載入逾時或網路異常，請稍後重試！";
+                const tr = document.createElement("tr");
+                tr.id = `row-${sId}`; // 設定唯一 ID 方便後續加上高亮樣式
+                tr.innerHTML = `
+                    <td class="${isSubmitted ? 'status-checked' : 'status-unchecked'}">
+                        ${isSubmitted ? '✅' : '❌'}
+                    </td>
+                    <td style="font-family:monospace; font-weight:bold;">${sId}</td>
+                    <td>${sName}</td>
+                    <td>${sClass}</td>
+                    <td class="url-cell">
+                        ${isSubmitted ? `<a onclick="previewStudentUrl('${sId}', '${record.url}')"> ${record.url}</a>` : '<span style="color:#a0aec0; font-style:italic;">尚未繳交</span>'}
+                    </td>
+                    <td style="font-size: 13px; color: #4a5568;">
+                        ${isSubmitted ? (record.time || "已記錄") : "-"}
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            document.getElementById("statsBadge").innerText = `已繳交：${submittedCount} / ${totalCount} 人`;
+        }
+
+        // 點擊後凸顯該列，並呼叫頂層 index.html 的滿版預覽功能
+        function previewStudentUrl(studentId, url) {
+            // 移除其他列的高亮
+            document.querySelectorAll("tr.highlight-row").forEach(row => {
+                row.classList.remove("highlight-row");
+            });
+
+            // 為目前點擊的這列加上高亮提示
+            const targetRow = document.getElementById(`row-${studentId}`);
+            if (targetRow) {
+                targetRow.classList.add("highlight-row");
+            }
+
+            // 開啟全螢幕滿版預覽
+            if (window.parent && typeof window.parent.openGlobalPreview === "function") {
+                window.parent.openGlobalPreview(url);
+            } else {
+                window.open(url, "_blank");
             }
         }
 
-        // 關閉燈箱
-        function closeModal() {
-            const modal = document.getElementById("imageModal");
-            const modalImg = document.getElementById("modalImg");
-
-            modal.classList.remove("active");
-            setTimeout(() => {
-                modal.style.display = "none";
-                modalImg.src = "";
-            }, 250);
+        function filterTable() {
+            renderTable();
         }
-
-        // 按 ESC 鍵關閉
-        document.addEventListener("keydown", (e) => {
-            if (e.key === "Escape") closeModal();
-        });
     </script>
 </body>
 

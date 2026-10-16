@@ -5,7 +5,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>作業上傳</title>
-    <!-- 引入 SweetAlert2 -->
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
         body {
@@ -28,6 +27,7 @@
         }
 
         input[type="text"],
+        input[type="url"],
         select {
             width: 100%;
             padding: 10px;
@@ -35,6 +35,12 @@
             border: 1px solid #ccc;
             border-radius: 5px;
             box-sizing: border-box;
+        }
+
+        input:disabled {
+            background-color: #f1f3f5;
+            color: #6c757d;
+            cursor: not-allowed;
         }
 
         #studentTip {
@@ -53,70 +59,126 @@
             margin-bottom: 16px;
         }
 
-        .extra-fields .form-group:last-child {
-            margin-bottom: 0;
-        }
-
-        /* 貼上與拖曳上傳框 */
-        .drop-zone {
-            border: 2px dashed #1976d2;
-            border-radius: 8px;
-            padding: 24px;
-            text-align: center;
+        /* 網址輸入與子網域解析顯示區塊 */
+        .url-builder-box {
             background: #f8fbff;
-            cursor: pointer;
-            transition: all 0.2s;
-            position: relative;
+            border: 1px solid #bbdefb;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 16px;
         }
 
-        .drop-zone:hover,
-        .drop-zone.dragover {
-            background: #e3f2fd;
-            border-color: #0d47a1;
+        .url-preview-row {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            margin-top: 6px;
         }
 
-        .drop-zone-text {
-            font-size: 15px;
-            color: #1976d2;
+        .url-preview-row input {
+            flex: 1;
+            background: #fff;
+            border: 2px solid #1976d2;
             font-weight: bold;
-            line-height: 1.6;
         }
 
-        .drop-zone-subtext {
-            font-size: 13px;
-            color: #666;
-            margin-top: 4px;
+        .test-link-btn {
+            padding: 10px 14px;
+            background: #edf2f7;
+            color: #2d3748;
+            border: 1px solid #cbd5e0;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            white-space: nowrap;
+            text-decoration: none;
         }
 
-        #previewBox {
-            display: none;
-            margin-top: 12px;
-            text-align: center;
+        .test-link-btn:hover {
+            background: #e2e8f0;
         }
 
-        #previewBox img {
-            max-width: 100%;
-            max-height: 520px;
+        /* 解析出的子網域提示框 */
+        .subpath-display {
+            margin-top: 10px;
+            padding: 10px;
+            background: #fffde7;
+            border: 1px dashed #fbc02d;
             border-radius: 6px;
-            border: 1px solid #ddd;
-            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+            font-size: 20px;
+            font-weight: bold;
+        }
+
+        /* 等比例縮小內嵌預覽區 */
+        .preview-scale-container {
+            display: none;
+            margin-top: 25px;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            border: 1px solid #cbd5e0;
+        }
+
+        .preview-scale-container.active {
+            display: block;
+        }
+
+        .preview-header {
+            background: #6a7e92;
+            color: #fff;
+            padding: 10px 16px;
+            font-size: 13px;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .iframe-wrapper {
+            position: relative;
+            width: 100%;
+            height: 480px;
+            background: #f7fafc;
+            overflow: hidden;
+        }
+
+        #previewIframe {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 166.66%;
+            height: 166.66%;
+            border: none;
+            background: #ffffff;
+            transform: scale(0.6);
+            transform-origin: 0 0;
+        }
+
+        .preview-footer-action {
+            padding: 12px 16px;
+            display: flex;
+            justify-content: center;
+            border-top: 1px solid #708daa;
         }
 
         button.submit-btn {
             width: 100%;
-            padding: 12px;
-            font-size: 16px;
+            padding: 14px;
+            font-size: 17px;
             font-weight: bold;
-            background: #1976d2;
+            background: #2e7d32;
             color: #fff;
             border: none;
-            border-radius: 5px;
+            border-radius: 6px;
             cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
             transition: background 0.2s;
         }
 
         button.submit-btn:hover {
-            background: #1565c0;
+            background: #1b5e20;
         }
 
         button.submit-btn:disabled {
@@ -124,7 +186,6 @@
             cursor: not-allowed;
         }
 
-        /* 控制 SweetAlert 頂部距離 */
         .custom-top-swal {
             margin-top: 45px !important;
             border-radius: 12px !important;
@@ -141,16 +202,19 @@
     </div>
 
     <div class="form-group">
-        <label for="studentId">學號（完整 10 碼）： <sapn style="font-size:12px;color:#ff7979;">請不要填寫"非本人"學號 (會覆蓋掉作業 ! )</span></label> 
-        <input type="text" id="studentId" maxlength="10" placeholder="例如：3311531001" autocomplete="off">
-        <div id="studentTip"></div>
-        
+        <label for="studentId">
+            學號（完整 10 碼）：
+            <span style="font-size:12px;color:#ff7979;">請不要填寫「非本人」學號（會覆蓋掉作業！）</span>
+        </label>
+        <input type="text" id="studentId" maxlength="10" placeholder="請輸入 10 碼學號，或直接至下方貼上完整網址..." disabled
+            autocomplete="off">
+        <div id="studentTip" style="color: #666;">⏳ 正在同步最新學生名冊...</div>
     </div>
 
-    <!-- 未在名冊中的同學手動補填框 -->
+    <!-- 未在名冊中的同學（補修/外系生）手動補填框 -->
     <div id="extraFields" class="extra-fields">
         <p style="margin: 0 0 10px; color: #e65100; font-size: 13px; font-weight: bold;">
-            ⚠️ 名冊中查無此學號（選修/外系生），請手動補填基本資料：
+            ⚠️ 試算表名冊中查無此學號（隨班附讀／補修生），請手動補填基本資料（送出後將自動建檔）：
         </p>
         <div class="form-group">
             <label for="customName">學生姓名：</label>
@@ -158,69 +222,84 @@
         </div>
         <div class="form-group">
             <label for="customClass">所屬班級：</label>
-            <input type="text" id="customClass" placeholder="例如：資管二A、企管三B">
+            <input type="text" id="customClass" placeholder="例如 : 資管二A、企管三B">
         </div>
     </div>
 
-    <div class="form-group">
-        <label>作業截圖（支援 Ctrl+V 貼上 / 檔案選取 / 拖曳）：</label>
-        <div class="drop-zone" id="dropZone" onclick="triggerFileInput()">
-            <div class="drop-zone-text">點擊選擇檔案，或直接按 <code>Ctrl + V</code> 貼上截圖</div>
-            <div class="drop-zone-subtext">也支援將圖片檔案拖曳至此處（自動轉為 JPG）</div>
-            <!-- 隱藏原生檔案選取器，由點擊或程式觸發 -->
-            <input type="file" id="imageFile" accept="image/*" style="display: none;">
+    <!-- 完整網址填寫與解析顯示區 -->
+    <div class="url-builder-box">
+        <div style="font-size: 14px; font-weight: bold; color: #1565c0; margin-bottom: 8px;">
+            📌 作業網址設定
         </div>
 
-        <div id="previewBox">
-            <img id="imagePreview" alt="作業截圖預覽">
-            <p style="font-size: 12px; color: #666; margin: 4px 0 0;">✓ 圖片已載入，可再次貼上或點擊替換</p>
+        <div class="form-group" style="margin-bottom: 0;">
+            <label for="homeworkUrl">本次要繳交的完整作業網址（貼上後會自動抓取學號與保留你的完整路徑）：</label>
+            <div class="url-preview-row">
+                <input type="url" id="homeworkUrl" placeholder="載入名冊中，請稍候..." disabled>
+                <a id="openTestBtn" href="#" target="_blank" class="test-link-btn" onclick="return checkBeforeOpen()">🔗
+                    新分頁開啟</a>
+            </div>
+        </div>
+
+        <!-- 即時解析並在下方顯示檔案名稱/路徑 -->
+        <div id="subpathDisplay" class="subpath-display" style="display: none;">
+            📂 繳交的網頁檔案名稱為：<span id="subpathText" style="font-family: monospace; color: #d32f2f;"></span>
         </div>
     </div>
 
-    <button id="submitBtn" class="submit-btn" onclick="submitHomework()">確認並送出繳交</button>
+    <!-- 等比例縮小預覽區 (有網址才顯示) -->
+    <div id="previewContainer" class="preview-scale-container">
+        <div class="preview-header">
+            <span>作業網頁等比例縮小預覽</span>
+            <span id="previewUrlText" style="color: #bdc3c7; font-weight: normal; font-size: 12px;"></span>
+        </div>
+        <div class="iframe-wrapper">
+            <iframe id="previewIframe" src="about:blank" title="作業等比例預覽"></iframe>
+        </div>
+        <div class="preview-footer-action">
+            <button id="submitBtn" class="submit-btn" onclick="submitHomework()">確認並送出繳交</button>
+        </div>
+    </div>
 
     <script src="config.js"></script>
     <script>
-        // 建立全域統一的靠頂彈窗
         const MySwal = Swal.mixin({
             position: "top",
-            customClass: {
-                popup: "custom-top-swal"
-            }
+            customClass: { popup: "custom-top-swal" }
         });
 
         let userIP = "未知";
         let isManualInput = false;
         let currentStudentName = "";
         let currentClassName = "";
-        let currentImageBlob = null; // 儲存當前選取或貼上的圖片 Blob
+
+        const studentInput = document.getElementById("studentId");
+        const tip = document.getElementById("studentTip");
+        const extraFields = document.getElementById("extraFields");
+        const homeworkUrlInput = document.getElementById("homeworkUrl");
+        const openTestBtn = document.getElementById("openTestBtn");
+        const previewIframe = document.getElementById("previewIframe");
+        const previewUrlText = document.getElementById("previewUrlText");
+        const previewContainer = document.getElementById("previewContainer");
+        const subpathDisplay = document.getElementById("subpathDisplay");
+        const subpathText = document.getElementById("subpathText");
 
         fetch("https://api.ipify.org?format=json")
             .then(res => res.json())
             .then(data => { userIP = data.ip; })
             .catch(() => { userIP = "獲取失敗"; });
 
-        document.addEventListener("DOMContentLoaded", () => {
+        document.addEventListener("DOMContentLoaded", async () => {
             initCourseDateSelect("courseDate");
+            await loadStudentsFromSheet();
+            studentInput.disabled = false;
+            homeworkUrlInput.disabled = false;
+            studentInput.placeholder = "例如：3311531044";
+            homeworkUrlInput.placeholder = "http://web3.nutc.edu.tw/~s3311531044/index.html";
+            tip.innerText = "";
         });
 
-        const studentInput = document.getElementById("studentId");
-        const tip = document.getElementById("studentTip");
-        const extraFields = document.getElementById("extraFields");
-        const fileInput = document.getElementById("imageFile");
-        const dropZone = document.getElementById("dropZone");
-        const previewBox = document.getElementById("previewBox");
-        const previewImg = document.getElementById("imagePreview");
-
-        // 觸發隱藏的 file input
-        function triggerFileInput() {
-            fileInput.click();
-        }
-
-        // 監聽學號輸入：即時驗證名單
-        studentInput.addEventListener("input", (e) => {
-            const val = e.target.value.trim();
-
+        function processStudentId(val, autoDefault = true) {
             if (val.length === 10) {
                 if (STUDENTS[val]) {
                     isManualInput = false;
@@ -235,100 +314,119 @@
                     currentClassName = "";
                     extraFields.style.display = "block";
                     tip.style.color = "#e65100";
-                    tip.innerText = "ℹ️ 非本班名冊名單，請於下方手動填寫「姓名」與「班級」";
+                    tip.innerText = "ℹ️ 試算表名冊查無此學號（補修/外系），請於下方填寫「姓名」與「班級」，送出後將自動建檔！";
                 }
+
+                // 只有在明確需要自動給預設值（例如手動輸入 10 碼學號時）才帶入 index.html
+                if (autoDefault) {
+                    const defaultUrl = `http://web3.nutc.edu.tw/~s${val}/index.html`;
+                    homeworkUrlInput.value = defaultUrl;
+                    handleUrlChange(defaultUrl, false);
+                }
+
             } else {
                 isManualInput = false;
                 extraFields.style.display = "none";
                 currentStudentName = "";
                 currentClassName = "";
+                tip.style.color = "#666";
                 tip.innerText = val.length > 0 ? `已輸入 ${val.length}/10 碼...` : "";
             }
-        });
-
-        // 統一處理圖片顯示
-        function handleImageBlob(blob) {
-            currentImageBlob = blob;
-            previewImg.src = URL.createObjectURL(blob);
-            previewBox.style.display = "block";
         }
 
-        // 1. 檔案選取上傳監聽
-        fileInput.addEventListener("change", function () {
-            const file = this.files[0];
-            if (file) {
-                handleImageBlob(file);
-            }
+        // 當手動輸入學號時觸發（此時會自動給 index.html）
+        studentInput.addEventListener("input", (e) => {
+            processStudentId(e.target.value.trim(), true);
         });
 
-        // 2. 剪貼簿「複製貼上 (Ctrl+V)」監聽
-        window.addEventListener("paste", function (e) {
-            // 如果游標正在打字（學號或姓名欄位），避免誤攔截文字貼上
-            if (e.target.tagName === "INPUT" && e.target.type === "text") {
-                // 如果剪貼簿裡不是圖片，就放行一般文字貼上
-                const hasImage = Array.from(e.clipboardData.items).some(item => item.type.indexOf("image") !== -1);
-                if (!hasImage) return;
+        // 當貼上或修改網址時，自動補足 http:// 與檢查根目錄自動帶入 index.html
+        function handleUrlChange(url, autoExtractId = true) {
+            let cleanUrl = url.trim();
+
+            if (cleanUrl && !cleanUrl.startsWith("http://") && !cleanUrl.startsWith("https://")) {
+                cleanUrl = "http://" + cleanUrl;
+                homeworkUrlInput.value = cleanUrl;
             }
 
-            const items = (e.clipboardData || window.clipboardData).items;
-            for (let i = 0; i < items.length; i++) {
-                if (items[i].type.indexOf("image") !== -1) {
-                    const blob = items[i].getAsFile();
-                    handleImageBlob(blob);
-                    
-                    // 貼上成功時給予微提示
-                    const originalText = dropZone.querySelector(".drop-zone-text").innerText;
-                    dropZone.querySelector(".drop-zone-text").innerText = " 已成功從剪貼簿貼上圖片！";
-                    setTimeout(() => {
-                        dropZone.querySelector(".drop-zone-text").innerHTML = " 點擊選擇檔案，或直接按 <code>Ctrl + V</code> 貼上截圖";
-                    }, 2500);
-                    break;
+            // 如果同學貼上的網址剛好停在學號資料夾根目錄（例如 http://web3.nutc.edu.tw/~s3311531024 或結尾是斜線），自動補上 index.html
+            const rootFolderPattern = /^https?:\/\/[^\/]+\/~s\d{10}\/?$/i;
+            if (rootFolderPattern.test(cleanUrl)) {
+                if (!cleanUrl.endsWith("/")) {
+                    cleanUrl += "/";
                 }
+                cleanUrl += "index.html";
+                homeworkUrlInput.value = cleanUrl;
             }
-        });
 
-        // 3. 拖曳檔案支援 (Drag & Drop)
-        dropZone.addEventListener("dragover", (e) => {
-            e.preventDefault();
-            dropZone.classList.add("dragover");
-        });
+            openTestBtn.href = cleanUrl || "#";
 
-        dropZone.addEventListener("dragleave", () => {
-            dropZone.classList.remove("dragover");
-        });
+            if (cleanUrl && cleanUrl.startsWith("http")) {
+                previewIframe.src = cleanUrl;
+                previewUrlText.innerText = cleanUrl;
+                previewContainer.classList.add("active");
 
-        dropZone.addEventListener("drop", (e) => {
-            e.preventDefault();
-            dropZone.classList.remove("dragover");
-            const file = e.dataTransfer.files[0];
-            if (file && file.type.startsWith("image/")) {
-                handleImageBlob(file);
+                try {
+                    const parsedUrl = new URL(cleanUrl);
+
+                    if (autoExtractId) {
+                        const studentMatch = parsedUrl.pathname.match(/\/~s(\d{10})/);
+                        if (studentMatch && studentMatch[1]) {
+                            const extractedId = studentMatch[1];
+                            if (studentInput.value.trim() !== extractedId) {
+                                studentInput.value = extractedId;
+                                processStudentId(extractedId, false);
+                            }
+                        }
+                    }
+
+                    // 解析出學號後面的檔案名稱 / 路徑
+                    const match = parsedUrl.pathname.match(/\/~s\d+\/(.*)/);
+                    if (match && match[1]) {
+                        subpathText.innerText = match[1];
+                        subpathDisplay.style.display = "block";
+                    } else {
+                        subpathText.innerText = parsedUrl.pathname;
+                        subpathDisplay.style.display = "block";
+                    }
+                } catch (err) {
+                    subpathText.innerText = cleanUrl;
+                    subpathDisplay.style.display = "block";
+                }
+            } else {
+                previewIframe.src = "about:blank";
+                previewUrlText.innerText = "";
+                previewContainer.classList.remove("active");
+                subpathDisplay.style.display = "none";
             }
+        }
+        homeworkUrlInput.addEventListener("input", (e) => {
+            handleUrlChange(e.target.value, true);
         });
 
-        // 送出繳交作業
+        function checkBeforeOpen() {
+            const url = homeworkUrlInput.value.trim();
+            if (!url || !url.startsWith("http")) {
+                MySwal.fire({ icon: "warning", title: "請先輸入完整網址", confirmButtonColor: "#1976d2" });
+                return false;
+            }
+            openTestBtn.href = url;
+            return true;
+        }
+
         async function submitHomework() {
             const id = studentInput.value.trim();
             const date = document.getElementById("courseDate").value;
+            const homeworkUrl = homeworkUrlInput.value.trim();
             const btn = document.getElementById("submitBtn");
+            const fileNameDisplay = subpathText.innerText || homeworkUrl;
 
             if (!date) {
-                MySwal.fire({
-                    icon: "warning",
-                    title: "提示",
-                    text: "目前尚無可選的上課日期或未開放！",
-                    confirmButtonColor: "#1976d2"
-                });
+                MySwal.fire({ icon: "warning", title: "提示", text: "目前尚無可選的上課日期！", confirmButtonColor: "#1976d2" });
                 return;
             }
 
             if (id.length !== 10) {
-                MySwal.fire({
-                    icon: "warning",
-                    title: "學號不完整",
-                    text: "請填寫正確且完整的 10 碼學號！",
-                    confirmButtonColor: "#1976d2"
-                });
+                MySwal.fire({ icon: "warning", title: "學號不完整", text: "請填寫正確且完整的 10 碼學號！", confirmButtonColor: "#1976d2" });
                 return;
             }
 
@@ -336,38 +434,30 @@
                 currentStudentName = document.getElementById("customName").value.trim();
                 currentClassName = document.getElementById("customClass").value.trim();
                 if (!currentStudentName || !currentClassName) {
-                    MySwal.fire({
-                        icon: "warning",
-                        title: "資料未完整",
-                        text: "請完整填寫手動補填的「姓名」與「班級」！",
-                        confirmButtonColor: "#1976d2"
-                    });
+                    MySwal.fire({ icon: "warning", title: "資料未完整", text: "請完整填寫手動補填的「姓名」與「班級」！", confirmButtonColor: "#1976d2" });
                     return;
                 }
             }
 
-            // 檢查是否有選取或貼上圖片
-            if (!currentImageBlob) {
-                MySwal.fire({
-                    icon: "warning",
-                    title: "請提供作業截圖",
-                    text: "請選擇圖片檔案，或按 Ctrl+V 貼上截圖！",
-                    confirmButtonColor: "#1976d2"
-                });
+            if (!homeworkUrl || !homeworkUrl.startsWith("http")) {
+                MySwal.fire({ icon: "warning", title: "網址格式有誤", text: "請提供完整的作業網址！", confirmButtonColor: "#1976d2" });
                 return;
             }
 
-            // 確認視窗
             const confirmResult = await MySwal.fire({
                 title: "確認繳交作業？",
                 html: `
-                    <div style="text-align: left; font-size: 14px; background: #f8f9fa; padding: 12px; border-radius: 6px; line-height: 1.8;">
+                    <div style="text-align: left; font-size: 14px; background: #f8f9fa; padding: 12px; border-radius: 6px; line-height: 1.8; word-break: break-all;">
                         <b>📅 上課日期：</b> ${date}<br>
                         <b>🆔 學生學號：</b> ${id}<br>
                         <b>👤 學生姓名：</b> ${currentStudentName}<br>
                         <b>🏫 所屬班級：</b> ${currentClassName}<br>
+                        <div style="background: #e3f2fd; border-left: 4px solid #1976d2; padding: 6px 10px; margin: 8px 0;">
+                            <b>📂 繳交檔案名稱：</b> <span style="color: #d32f2f; font-weight: bold; font-family: monospace;">${fileNameDisplay}</span>
+                        </div>
+                        <b>🔗 完整網址：</b> <a href="${homeworkUrl}" target="_blank">${homeworkUrl}</a><br>
                         <hr style="border: none; border-top: 1px dashed #ccc; margin: 8px 0;">
-                        <span style="color: #e65100;">⚠️ 若當日已有繳交紀錄，新檔案將自動覆蓋舊作業。</span>
+                        <span style="color: #e65100;">⚠️ 若當日已有繳交紀錄，新網址將自動覆蓋舊紀錄。</span>
                     </div>
                 `,
                 icon: "question",
@@ -380,86 +470,63 @@
 
             if (!confirmResult.isConfirmed) return;
 
-            // Loading 視窗
             MySwal.fire({
                 title: "上傳中...",
-                text: "正在上傳資料，請稍候",
+                text: "正在將作業紀錄寫入雲端試算表，請稍候",
                 allowOutsideClick: false,
                 allowEscapeKey: false,
-                didOpen: () => {
-                    Swal.showLoading();
-                }
+                didOpen: () => { Swal.showLoading(); }
             });
 
             btn.disabled = true;
 
-            const img = new Image();
-            const reader = new FileReader();
-
-            reader.onload = function (e) {
-                img.src = e.target.result;
-                img.onload = async function () {
-                    const canvas = document.createElement("canvas");
-                    canvas.width = img.width;
-                    canvas.height = img.height;
-                    const ctx = canvas.getContext("2d");
-
-                    ctx.fillStyle = "#FFFFFF";
-                    ctx.fillRect(0, 0, canvas.width, canvas.height);
-                    ctx.drawImage(img, 0, 0);
-
-                    const jpegBase64 = canvas.toDataURL("image/jpeg", 0.92);
-
-                    const payload = {
-                        courseDate: date,
-                        studentId: id,
-                        studentName: currentStudentName,
-                        className: currentClassName,
-                        clientIP: userIP,
-                        image: jpegBase64
-                    };
-
-                    try {
-                        const res = await fetch(GAS_URL, {
-                            method: "POST",
-                            body: JSON.stringify(payload)
-                        });
-                        const result = await res.json();
-
-                        if (result.status === "success") {
-                            await MySwal.fire({
-                                icon: "success",
-                                title: "繳交成功！",
-                                html: `
-                                    <b>檔名：</b>${result.fileName}<br>
-                                    <b>狀態：</b>${result.overwritten ? "<span style='color:#e65100;'>已成功覆蓋舊作業</span>" : "<span style='color:#2e7d32;'>新作業已建立</span>"}<br>
-                                    <b>更新時間：</b>${result.updatedTime}
-                                `,
-                                confirmButtonColor: "#1976d2"
-                            });
-                            location.reload();
-                        } else {
-                            MySwal.fire({
-                                icon: "error",
-                                title: "上傳失敗",
-                                text: result.message || "系統回傳錯誤，請聯絡管理員！",
-                                confirmButtonColor: "#1976d2"
-                            });
-                        }
-                    } catch (err) {
-                        await MySwal.fire({
-                            icon: "info",
-                            title: "資料已送出",
-                            text: "連線狀態已確認，請至清單預覽確認作業是否呈現！",
-                            confirmButtonColor: "#1976d2"
-                        });
-                        location.reload();
-                    } finally {
-                        btn.disabled = false;
-                    }
+            try {
+                const payload = {
+                    courseDate: date,
+                    studentId: id,
+                    studentName: currentStudentName,
+                    className: currentClassName,
+                    homeworkUrl: homeworkUrl,
+                    clientIP: userIP
                 };
-            };
-            reader.readAsDataURL(currentImageBlob);
+
+                const res = await fetch(GAS_URL, {
+                    method: "POST",
+                    body: JSON.stringify(payload)
+                });
+                const result = await res.json();
+
+                if (result.status === "success") {
+                    await MySwal.fire({
+                        icon: "success",
+                        title: "繳交成功！",
+                        html: `
+                            <b>繳交網址：</b><br><a href="${result.homeworkUrl}" target="_blank" style="word-break:break-all;">${result.homeworkUrl}</a><br><br>
+                            <b>狀態：</b>${result.overwritten ? "<span style='color:#e65100;'>已成功覆蓋舊作業網址</span>" : "<span style='color:#2e7d32;'>新作業已建立</span>"}<br>
+                            <b>更新時間：</b>${result.updatedTime}
+                        `,
+                        confirmButtonColor: "#1976d2"
+                    });
+                    location.reload();
+                } else {
+                    MySwal.fire({
+                        icon: "error",
+                        title: "上傳失敗",
+                        text: result.message || "系統回傳錯誤，請聯絡管理員！",
+                        confirmButtonColor: "#1976d2"
+                    });
+                }
+            } catch (err) {
+                await MySwal.fire({
+                    icon: "info",
+                    title: "資料已送出",
+                    text: "請至清單預覽分頁確認作業網址是否已呈現！",
+                    confirmButtonColor: "#1976d2"
+                });
+                location.reload();
+            } finally {
+                btn.disabled = false;
+            }
         }
     </script>
 </body>
